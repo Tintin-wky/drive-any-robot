@@ -10,6 +10,7 @@ gnm_deployment/topomaps/bags/*
 
 .vscode/*
 */.vscode/*
+*.bag
 
 
 # Byte-compiled / optimized / DLL files
