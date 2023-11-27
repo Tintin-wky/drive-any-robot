@@ -63,7 +63,7 @@ def process_odom(
     odom_list: list,
     odom_process_func: Any,
     ang_offset: float = 0.0,
-) -> dict[np.ndarray, np.ndarray]:
+) -> dict(np.ndarray, np.ndarray):
     """
     Process odom data from a topic that publishes nav_msgs/Odometry into position and yaw
     """
@@ -76,7 +76,7 @@ def process_odom(
     return {"position": np.array(xys), "yaw": np.array(yaws)}
 
 
-def nav_to_xy_yaw(odom_msg, ang_offset: float) -> tuple[list[float], float]:
+def nav_to_xy_yaw(odom_msg, ang_offset: float) -> tuple(list(float), float):
     """
     Process odom data from a topic that publishes nav_msgs/Odometry into position
     """
@@ -98,8 +98,8 @@ def nav_to_xy_yaw(odom_msg, ang_offset: float) -> tuple[list[float], float]:
 
 def get_images_and_odom(
     bag: rosbag.Bag,
-    imtopics: list[str] or str,
-    odomtopics: list[str] or str,
+    imtopics: list(str) or str,
+    odomtopics: list(str) or str,
     img_process_func: Any,
     odom_process_func: Any,
     rate: float = 4.0,
@@ -188,11 +188,11 @@ def is_backwards(
 
 # cut out non-positive velocity segments of the trajectory
 def filter_backwards(
-    img_list: list[Image.Image],
-    traj_data: dict[np.ndarray],
+    img_list: list(Image.Image),
+    traj_data: dict(np.ndarray),
     start_slack: int = 0,
     end_slack: int = 0,
-) -> tuple[list[np.ndarray], list[int]]:
+) -> tuple(list(np.ndarray), list(int)):
     """
     Cut out non-positive velocity segments of the trajectory
     Args:
@@ -210,7 +210,7 @@ def filter_backwards(
     cut_trajs = []
     start = True
 
-    def process_pair(traj_pair: list) -> tuple[list, dict]:
+    def process_pair(traj_pair: list) -> tuple(list, dict):
         new_img_list, new_traj_data = zip(*traj_pair)
         new_traj_data = np.array(new_traj_data)
         new_traj_pos = new_traj_data[:, :2]
