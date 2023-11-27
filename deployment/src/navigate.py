@@ -25,7 +25,7 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
-IMAGE_TOPIC = "/usb_cam/image_raw"
+IMAGE_TOPIC = "/camera/left/image_raw"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
