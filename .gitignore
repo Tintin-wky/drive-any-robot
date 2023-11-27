@@ -11,7 +11,7 @@ gnm_deployment/topomaps/bags/*
 .vscode/*
 */.vscode/*
 *.bag
-
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
