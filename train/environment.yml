@@ -1,6 +1,12 @@
 name: gnm_train
 channels:
 - pytorch
+- conda-forge
+- https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+- https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+- https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+- https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/pro
+- https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
 dependencies:
 - python=3.8.5
 - cudatoolkit=10.
@@ -17,3 +23,4 @@ dependencies:
   - --extra-index-url https://rospypi.github.io/simple/ 
   - rosbag
   - roslz4
+  - -i https://pypi.tuna.tsinghua.edu.cn/simple

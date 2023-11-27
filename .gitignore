@@ -10,7 +10,10 @@ gnm_deployment/topomaps/bags/*
 
 .vscode/*
 */.vscode/*
-
+recon_release/
+train/recon/
+train/gnm_train/data/data_splits
+train/wandb/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
