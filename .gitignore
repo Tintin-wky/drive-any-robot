@@ -10,6 +10,8 @@ gnm_deployment/topomaps/bags/*
 
 .vscode/*
 */.vscode/*
+*.bag
+*.png
 recon_release/
 train/recon/
 train/gnm_train/data/data_splits

@@ -2,13 +2,14 @@ import argparse
 import os
 from utils import msg_to_pil 
 import time
+import shutil
 
 # ROS
 import rospy
 from sensor_msgs.msg import Image
 from sensor_msgs.msg import Joy
 
-IMAGE_TOPIC = "/usb_cam/image_raw"
+IMAGE_TOPIC = "/camera/left/image_raw"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 obs_img = None
 
