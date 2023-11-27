@@ -28,7 +28,7 @@ def clip_angle(theta) -> float:
 	return theta - 2 * np.pi
       
 
-def pd_controller(waypoint: np.ndarray) -> Tuple(float):
+def pd_controller(waypoint: np.ndarray) -> Tuple[float]:
 	"""PD controller for the robot"""
 	assert len(waypoint) == 2 or len(waypoint) == 4, "waypoint must be a 2D or 4D vector"
 	if len(waypoint) == 2:
@@ -75,6 +75,7 @@ def main():
 	rate = rospy.Rate(RATE)
 	print("Registered with master node. Waiting for waypoints...")
 	while not rospy.is_shutdown():
+		global vel_msg
 		vel_out.publish(vel_msg)
 		if reached_goal:
 			vel_msg = Twist()
