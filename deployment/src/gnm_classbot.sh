@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Create a new tmux session
-session_name="gnm_classnpt_$(date +%s)"
+session_name="gnm_classbot_$(date +%s)"
 tmux new-session -d -s $session_name
 pass_word="classlab"
 
@@ -11,8 +11,8 @@ tmux splitw -v -p 50 # split it into two halves
 
 # Run the can0 connect command in the first pane
 tmux select-pane -t 0
-# tmux send-keys "sudo modprobe gs_usb" Enter
-# tmux send-keys "sudo ip link set can0 up type can bitrate 500000" Enter
+tmux send-keys "echo ${pass_word} | sudo -S modprobe gs_usb" Enter
+tmux send-keys "echo ${pass_word} | sudo -S ip link set can0 up type can bitrate 500000" Enter
 tmux send-keys "candump can0" Enter
 
 # Run the ros launch command in the second pane
