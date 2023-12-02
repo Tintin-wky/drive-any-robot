@@ -23,7 +23,7 @@ tmux send-keys "roslaunch gnm_classbot.launch" Enter
 # Change the directory to ../topomaps/bags and run the rosbag record command in the third pane
 tmux select-pane -t 2
 tmux send-keys "cd ../topomaps/bags" Enter
-tmux send-keys "rosbag record /camera/left/image_raw /camera/right/image_raw /scout_status -o $1" # change topic if necessary
+tmux send-keys "rosbag record /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel -o $1" # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name
