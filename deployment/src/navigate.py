@@ -14,7 +14,7 @@ import yaml
 from utils import msg_to_pil, to_numpy, transform_images, load_model
 
 import sys
-sys.path.append('/home/classlab/data/drive-any-robot/train')
+sys.path.append('/home/classlab/drive-any-robot/train')
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 MODEL_WEIGHTS_PATH = "../model_weights"
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir",
         "-d",
-        default="topomap",
+        default="test0",
         type=str,
         help="path to topomap images",
     )
