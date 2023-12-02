@@ -21,8 +21,8 @@ tmux send-keys "conda activate gnm_deployment" Enter
 tmux send-keys "python create_topomap.py --dt 1 --dir $1" Enter
 
 # Image conversion
-tmux select-pane -t 2
-tmux send-keys "rosrun image_transport republish compressed in:=/camera/left/image_raw raw out:=/camera/left/image_raw" Enter
+# tmux select-pane -t 2
+# tmux send-keys "rosrun image_transport republish compressed in:=/camera/left/image_raw raw out:=/camera/left/image_raw" Enter
 
 # Change the directory to ../topomaps/bags and run the rosbag play command in the third pane
 tmux select-pane -t 3

@@ -30,18 +30,11 @@ def callback_obs(msg: Image):
     global obs_img
     obs_img = msg_to_pil(msg)
 
-
-def callback_joy(msg: Joy):
-    if msg.buttons[0]:
-        rospy.signal_shutdown("shutdown")
-
-
 def main(args: argparse.Namespace):
     global obs_img
     rospy.init_node("CREATE_TOPOMAP", anonymous=False)
     image_curr_msg = rospy.Subscriber(
         IMAGE_TOPIC, Image, callback_obs, queue_size=1)
-    joy_sub = rospy.Subscriber("joy", Joy, callback_joy)
 
     topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, args.dir)
     if not os.path.isdir(topomap_name_dir):

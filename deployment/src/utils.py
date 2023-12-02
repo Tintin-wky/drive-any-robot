@@ -69,7 +69,7 @@ def load_model(
 
 def msg_to_pil(msg: Image) -> PILImage.Image:
     img = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
-    pil_image = PILImage.fromarray(img)
+    pil_image = PILImage.fromarray(img[..., ::-1])
     return pil_image
 
 
