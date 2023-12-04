@@ -7,10 +7,13 @@ import shutil
 # ROS
 import rospy
 from sensor_msgs.msg import Image
-from sensor_msgs.msg import Joy
+
+from topomap import Topomap
+import pickle
 
 IMAGE_TOPIC = "/camera/left/image_raw"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
+TOPOMAP_MATRIX = "../topomaps/matrix.pkl"
 obs_img = None
 
 
@@ -36,22 +39,24 @@ def main(args: argparse.Namespace):
     image_curr_msg = rospy.Subscriber(
         IMAGE_TOPIC, Image, callback_obs, queue_size=1)
 
-    topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, args.dir)
+    topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, args.name)
     if not os.path.isdir(topomap_name_dir):
         os.makedirs(topomap_name_dir)
     else:
         print(f"{topomap_name_dir} already exists. Removing previous images...")
         remove_files_in_dir(topomap_name_dir)
-        
+    
 
     assert args.dt > 0, "dt must be positive"
     rate = rospy.Rate(1/args.dt)
     print("Registered with master node. Waiting for images...")
     i = 0
     start_time = float("inf")
+    topomap=Topomap()
     while not rospy.is_shutdown():
         if obs_img is not None:
             obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
+            topomap.update(i,obs_img,args.dt)
             print("published image", i)
             i += 1
             rate.sleep()
@@ -60,6 +65,8 @@ def main(args: argparse.Namespace):
         if time.time() - start_time > 2 * args.dt:
             print(f"Topic {IMAGE_TOPIC} not publishing anymore. Shutting down...")
             rospy.signal_shutdown("shutdown")
+            with open(TOPOMAP_MATRIX, 'wb') as file:
+                pickle.dump(dict([(args.name,topomap.get_adjacency_matrix())]), file)
 
 
 if __name__ == "__main__":
@@ -67,11 +74,11 @@ if __name__ == "__main__":
         description=f"Code to generate topomaps from the {IMAGE_TOPIC} topic"
     )
     parser.add_argument(
-        "--dir",
-        "-d",
+        "--name",
+        "-n",
         default="topomap",
         type=str,
-        help="path to topological map images in ../topomaps/images directory (default: topomap)",
+        help="name of your topomap (default: topomap)",
     )
     parser.add_argument(
         "--dt",

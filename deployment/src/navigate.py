@@ -116,13 +116,15 @@ def main(args: argparse.Namespace):
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
             start = max(closest_node - args.radius, 0)
-            end = min(closest_node + args.radius + 1, goal_node)
+            end = min(closest_node + args.radius, goal_node)
             distances = []
             waypoints = []
             for sg_img in topomap[start: end + 1]:
                 transf_obs_img = transform_images(context_queue, model_params["image_size"])
                 transf_sg_img = transform_images(sg_img, model_params["image_size"])
                 dist, waypoint = model(transf_obs_img, transf_sg_img) 
+                # transf_goal_img = transform_images(topomap[-1], model_params["image_size"])
+                # dist, waypoint = model(transf_obs_img, transf_goal_img) 
                 distances.append(to_numpy(dist[0]))
                 waypoints.append(to_numpy(waypoint[0]))
             # look for closest node
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dir",
         "-d",
-        default="test0",
+        default="test",
         type=str,
         help="path to topomap images",
     )

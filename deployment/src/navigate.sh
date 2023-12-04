@@ -17,6 +17,7 @@ tmux selectp -t 0    # go back to the first pane
 
 # Run the ros launch command in the first pane
 tmux select-pane -t 0
+tmux send-keys "roscore" Enter
 tmux send-keys "roslaunch gnm_classbot.launch" Enter
 
 # Run the navigate.py script with command line args in the sencond pane
