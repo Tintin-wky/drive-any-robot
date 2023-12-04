@@ -19,6 +19,7 @@ tmux send-keys "roscore" Enter
 tmux select-pane -t 1
 tmux send-keys "conda activate gnm_deployment" Enter
 tmux send-keys "python create_topomap.py --dt 1 --name $1" Enter
+tmux send-keys "python topomap_visualization.py --name $1" Enter
 
 # Image conversion
 tmux select-pane -t 2

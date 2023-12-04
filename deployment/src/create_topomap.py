@@ -28,10 +28,22 @@ def remove_files_in_dir(dir_path: str):
         except Exception as e:
             print("Failed to delete %s. Reason: %s" % (file_path, e))
 
+def not_green_image(image):
+    green_pixels = 0
+    total_pixels = image.width * image.height
+
+    for pixel in image.getdata():
+        if pixel[0] == 0 and pixel[1] != 0 and pixel[2] == 0:  # (R, G, B)，检查是否为绿色
+            green_pixels += 1
+
+    # 如果所有像素都是绿色，则图像是完全绿色的
+    return green_pixels != total_pixels
 
 def callback_obs(msg: Image):
     global obs_img
-    obs_img = msg_to_pil(msg)
+    temp_img = msg_to_pil(msg)
+    if not_green_image(temp_img):
+        obs_img = temp_img
 
 def main(args: argparse.Namespace):
     global obs_img
