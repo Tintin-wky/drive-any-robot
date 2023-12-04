@@ -17,8 +17,7 @@ tmux selectp -t 0    # go back to the first pane
 
 # Run the ros launch command in the first pane
 tmux select-pane -t 0
-tmux send-keys "roscore" Enter
-tmux send-keys "roslaunch gnm_classbot.launch" Enter
+tmux send-keys "./gnm_classbot.sh" Enter
 
 # Run the navigate.py script with command line args in the sencond pane
 tmux select-pane -t 1
@@ -33,7 +32,7 @@ tmux send-keys "python pd_controller.py" Enter
 # Change the directory to ../navigate/bags and run the rosbag record command in the fourth pane
 tmux select-pane -t 3
 tmux send-keys "cd ../navigate/bags" Enter
-tmux send-keys "rosbag record /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel -o $log" Enter # change topic if necessary
+tmux send-keys "rosbag record /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis -o $log"  # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name

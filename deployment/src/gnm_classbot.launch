@@ -5,7 +5,8 @@
 
   <!-- Chassis Info -->
   <include file="$(find scout_bringup)/launch/scout_robot_base.launch">
-     <arg name="odom_topic_name" value:="odom_chassis" />
+     <arg name="odom_topic_name" value="odom_chassis" >
+     </arg>
   </include>
 
   <!-- ByNav GNSS/INS -->

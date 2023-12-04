@@ -60,8 +60,8 @@ def callback_obs(msg):
 def main(args: argparse.Namespace):
     # load topomap
     topomap_filenames = sorted(os.listdir(os.path.join(
-        TOPOMAP_IMAGES_DIR, args.dir)), key=lambda x: int(x.split(".")[0]))
-    topomap_dir = f"{TOPOMAP_IMAGES_DIR}/{args.dir}"
+        TOPOMAP_IMAGES_DIR, args.name)), key=lambda x: int(x.split(".")[0]))
+    topomap_dir = f"{TOPOMAP_IMAGES_DIR}/{args.name}"
     num_nodes = len(os.listdir(topomap_dir))
     topomap = []
     for i in range(num_nodes):
@@ -154,11 +154,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Code to run GNMs on the locobot")
     parser.add_argument(
-        "--dir",
-        "-d",
+        "--name",
+        "-n",
         default="test",
         type=str,
-        help="path to topomap images",
+        help="topomap name",
     )
     parser.add_argument(
         "--model",
