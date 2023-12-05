@@ -7,11 +7,13 @@ import torch
 from PIL import Image as PILImage
 import numpy as np
 import os
+import time
 import argparse
 import yaml
 
 # UTILS
 from utils import msg_to_pil, to_numpy, transform_images, load_model
+from topomap import Topomap
 
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
@@ -26,6 +28,8 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw"
+DESTINATION_DOMAIN = 3
+DESTINATION_PATH = "../destination"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -41,32 +45,30 @@ model_params = {
     "goal_encoding_size": 1024, # size of the encoding of the goal [only used by gnm and siamese]
     "obsgoal_encoding_size": 2048, # size of the encoding of the observation and goal [only used by stacked model]
 }
-
-# GLOBALS
-context_queue = []
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
+# GLOBALS
+context_queue = []
+last_time = float("inf")
 def callback_obs(msg):
-    obs_img = msg_to_pil(msg)
-    if len(context_queue) < model_params["context"] + 1:
-        context_queue.append(obs_img)
-    else:
-        context_queue.pop(0)
-        context_queue.append(obs_img)
+    time_now=time.time()
+    if time_now < last_time:
+        last_time = time_now
+    if time_now - last_time >= 1/RATE:
+        last_time = time_now
+        obs_img = msg_to_pil(msg)
+        if len(context_queue) < model_params["context"] + 1:
+            context_queue.append(obs_img)
+        else:
+            context_queue.pop(0)
+            context_queue.append(obs_img)
     
 
 def main(args: argparse.Namespace):
-    # load topomap
-    topomap_filenames = sorted(os.listdir(os.path.join(
-        TOPOMAP_IMAGES_DIR, args.name)), key=lambda x: int(x.split(".")[0]))
-    topomap_dir = f"{TOPOMAP_IMAGES_DIR}/{args.name}"
-    num_nodes = len(os.listdir(topomap_dir))
-    topomap = []
-    for i in range(num_nodes):
-        image_path = os.path.join(topomap_dir, topomap_filenames[i])
-        topomap.append(PILImage.open(image_path))
+    # load destination
+    destination = args.destination
+    goal_img=PILImage.open(destination)
 
     # load model parameters
     with open(MODEL_CONFIG_PATH, "r") as f:
@@ -103,51 +105,34 @@ def main(args: argparse.Namespace):
         "/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
-
-    closest_node = 0
-    assert -1 <= args.goal_node < len(topomap), "Invalid goal index"
-    if args.goal_node == -1:
-        goal_node = len(topomap) - 1
-    else:
-        goal_node = args.goal_node
+    
     reached_goal = False
+    i = 0
+    topomap=Topomap()
 
-    # navigation loop
+    # exploration loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
-            start = max(closest_node - args.radius, 0)
-            end = min(closest_node + args.radius, goal_node)
-            distances = []
-            waypoints = []
-            for sg_img in topomap[start: end + 1]:
-                transf_obs_img = transform_images(context_queue, model_params["image_size"])
-                transf_sg_img = transform_images(sg_img, model_params["image_size"])
-                dist, waypoint = model(transf_obs_img, transf_sg_img) 
-                # transf_goal_img = transform_images(topomap[-1], model_params["image_size"])
-                # dist, waypoint = model(transf_obs_img, transf_goal_img) 
-                distances.append(to_numpy(dist[0]))
-                waypoints.append(to_numpy(waypoint[0]))
-            # look for closest node
-            closest_node = np.argmin(distances)
-            # chose subgoal and output waypoints
-            if distances[closest_node] > args.close_threshold:
-                chosen_waypoint = waypoints[closest_node][args.waypoint]
-            else:
-                chosen_waypoint = waypoints[min(
-                    closest_node + 1, len(waypoints) - 1)][args.waypoint]
+
+            transf_obs_img = transform_images(context_queue, model_params["image_size"])
+            transf_goal_img = transform_images(goal_img, model_params["image_size"])
+            dist, waypoint = model(transf_obs_img, transf_goal_img) 
+            distance=to_numpy(dist[0])
+            waypoint=to_numpy(waypoint[0])
+
             waypoint_msg = Float32MultiArray()
             if model_params["normalize"]:
-                chosen_waypoint[:2] *= (MAX_V / RATE)
-            waypoint_msg.data = chosen_waypoint
+                waypoint[:2] *= (MAX_V / RATE)
+            waypoint_msg.data = waypoint
             waypoint_pub.publish(waypoint_msg)
-            closest_node += start
-            reached_goal = closest_node == goal_node
-            rospy.loginfo(f"Closest node: {closest_node} Estimate distance:{distances[closest_node]} \
-                  Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
+            rospy.loginfo(f"Next waypoint: dx:{waypoint[0]} dy:{waypoint[1]} Estimate distance:{distance}")
+
+            reached_goal = distance < args.close_threshold
             goal_pub.publish(reached_goal)
             if reached_goal:
                 rospy.loginfo("Reached goal Stopping...")
                 return
+            
             rate.sleep()
 
 
@@ -155,11 +140,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Code to run GNMs on the locobot")
     parser.add_argument(
-        "--name",
-        "-n",
-        default="test",
+        "--destination",
+        "-d",
+        default="../destination/1.png",
         type=str,
-        help="topomap name",
+        help="path to destination image",
     )
     parser.add_argument(
         "--model",
@@ -191,14 +176,6 @@ if __name__ == "__main__":
         type=int,
         help=f"""index of the waypoint used for navigation (between 0 and 4 or 
         how many waypoints your model predicts) (default: 2)""",
-    )
-    parser.add_argument(
-        "--goal-node",
-        "-g",
-        default=-1,
-        type=int,
-        help="""goal node index in the topomap (if -1, then the goal node is 
-        the last node in the topomap) (default: -1)""",
     )
     args = parser.parse_args()
     print(f"Using {device}")
