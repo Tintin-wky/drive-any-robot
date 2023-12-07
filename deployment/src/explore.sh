@@ -25,7 +25,7 @@ tmux send-keys "roslaunch gnm_classbot.launch" Enter
 # Run the navigate.py script with command line args in the sencond pane
 tmux select-pane -t 1
 tmux send-keys "conda activate gnm_deployment" Enter
-tmux send-keys "python navigate.py $@" Enter
+tmux send-keys "python explore.py $@" Enter
 
 # Run the pd_controller.py script in the third pane
 tmux select-pane -t 2

@@ -156,7 +156,7 @@ def main(args: argparse.Namespace):
             waypoint_pub.publish(waypoint_msg)
             rospy.loginfo(f"Estimate distance:{distance} Next waypoint: dx:{waypoint[0]} dy:{waypoint[1]} ")
 
-            reached_goal = distance < args.close_threshold
+            reached_goal = bool(distance < args.close_threshold)
             goal_pub.publish(reached_goal)
             if reached_goal:
                 rospy.loginfo("Reached goal Stopping...")
@@ -166,7 +166,7 @@ def main(args: argparse.Namespace):
                 i += 1
                 with open(TOPOMAP_MATRIX, 'wb') as file:
                     pickle.dump(dict([(args.name,topomap.get_adjacency_matrix())]), file)
-                # return
+                return
             global last_message_time
             if rospy.get_time() - last_message_time > 1:
                 rospy.loginfo("No message received for {} seconds. Exiting...".format(1))
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--destination",
         "-d",
-        default="../topomaps/destination/5.png",
+        default="../topomaps/destination/8.png",
         type=str,
         help="path to destination image",
     )
