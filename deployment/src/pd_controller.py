@@ -58,7 +58,7 @@ def callback_drive(waypoint_msg: Float32MultiArray):
 	vel_msg = Twist()
 	vel_msg.linear.x = v
 	vel_msg.angular.z = w
-	print("publishing new vel")
+	rospy.loginfo(f"publishing new vel: v:{v} w:{w}")
 
 
 def callback_reached_goal(reached_goal_msg: Bool):
@@ -73,14 +73,14 @@ def main():
 	reached_goal_sub = rospy.Subscriber("/topoplan/reached_goal", Bool, callback_reached_goal, queue_size=1)
 	vel_out = rospy.Publisher(VEL_TOPIC, Twist, queue_size=1)
 	rate = rospy.Rate(RATE)
-	print("Registered with master node. Waiting for waypoints...")
+	rospy.loginfo("Registered with master node. Waiting for waypoints...")
 	while not rospy.is_shutdown():
 		global vel_msg
 		vel_out.publish(vel_msg)
 		if reached_goal:
 			vel_msg = Twist()
 			vel_out.publish(vel_msg)
-			print("Reached goal! Stopping...")
+			rospy.loginfo("Reached goal! Stopping...")
 			return
 		rate.sleep()
 	

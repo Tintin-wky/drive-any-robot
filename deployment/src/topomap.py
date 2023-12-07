@@ -37,7 +37,7 @@ class Topomap(nx.DiGraph):
                     self.add_edge(i, j, weight=weight)
     
     def visualize(self,show_image=True):
-        pos = nx.spring_layout(self)
+        pos = nx.circular_layout(self)
         edge_weights = [edge[2]['weight'] for edge in self.edges(data=True)]
 
         fig, ax = plt.subplots()

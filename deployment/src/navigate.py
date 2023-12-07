@@ -1,6 +1,6 @@
 # ROS
 import rospy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image,CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
 
 import torch
@@ -9,6 +9,7 @@ import numpy as np
 import os
 import argparse
 import yaml
+import io
 
 # UTILS
 from utils import msg_to_pil, to_numpy, transform_images, load_model
@@ -25,7 +26,7 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
-IMAGE_TOPIC = "/camera/left/image_raw"
+IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -49,7 +50,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 def callback_obs(msg):
-    obs_img = msg_to_pil(msg)
+    obs_img = PILImage.open(io.BytesIO(msg.data))
     if len(context_queue) < model_params["context"] + 1:
         context_queue.append(obs_img)
     else:
@@ -98,7 +99,7 @@ def main(args: argparse.Namespace):
     rospy.init_node("TOPOPLAN", anonymous=False)
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(
-        IMAGE_TOPIC, Image, callback_obs, queue_size=1)
+        IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
     waypoint_pub = rospy.Publisher(
         "/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)

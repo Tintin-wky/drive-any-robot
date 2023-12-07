@@ -61,7 +61,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rosbag",
         "-r",
-        default="../topomaps/bags/test.bag",
+        default="../topomaps/bags/raw/test.bag",
         type=str,
         help="path to your rosbag (default: topomap)",
     )
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dt",
         "-t",
-        default=3.,
+        default=5.,
         type=float,
         help=f"time between images sampled from the {IMAGE_TOPIC} topic (default: 3.0)",
     )
