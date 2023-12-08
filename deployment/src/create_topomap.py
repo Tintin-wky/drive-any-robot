@@ -63,14 +63,14 @@ if __name__ == "__main__":
         "-r",
         default="../topomaps/bags/raw/test.bag",
         type=str,
-        help="path to your rosbag (default: topomap)",
+        help="path to your rosbag (default: test)",
     )
     parser.add_argument(
         "--name",
         "-n",
-        default="topomap",
+        default="test",
         type=str,
-        help="name of your topomap (default: topomap)",
+        help="name of your topomap (default: test)",
     )
     parser.add_argument(
         "--dt",

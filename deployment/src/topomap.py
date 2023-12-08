@@ -57,6 +57,6 @@ class Topomap(nx.DiGraph):
         edge_labels = {(k[0], k[1]): f"{v:.2f}" for k, v in edge_labels.items()}
 
         nx.draw_networkx_edges(self, pos, width=edge_weights)
-        nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
+        # nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
         plt.axis('off')
         plt.show()

@@ -141,10 +141,10 @@ def main(args: argparse.Namespace):
                 chosen_waypoint[:2] *= (MAX_V / RATE)
             waypoint_msg.data = chosen_waypoint
             waypoint_pub.publish(waypoint_msg)
+            rospy.loginfo(f"Closest node: {closest_node + start} Estimate distance:{distances[closest_node]} \
+                  Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
             closest_node += start
             reached_goal = closest_node == goal_node
-            rospy.loginfo(f"Closest node: {closest_node} Estimate distance:{distances[closest_node]} \
-                  Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
             goal_pub.publish(reached_goal)
             if reached_goal:
                 rospy.loginfo("Reached goal Stopping...")
