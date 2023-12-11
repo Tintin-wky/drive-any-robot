@@ -13,17 +13,18 @@ class Topomap(nx.DiGraph):
         adjacency_matrix = np.full((num_nodes, num_nodes), np.inf, dtype=float)
         np.fill_diagonal(adjacency_matrix, 0)
 
+        for node,data in self.nodes(data=True):
+            adjacency_matrix[node][node] = data['count']
+
         for node1,node2,data in self.edges(data=True):
             adjacency_matrix[node1][node2] = data['weight']
 
         return adjacency_matrix
       
-    def load_nodes(self,topomap):
-        image_files = sorted(os.listdir(topomap))
+    def load(self,topomap_folder,adjacency_matrix):
+        image_files = sorted(os.listdir(topomap_folder))
         for i, image_file in enumerate(image_files):
-            self.add_node(i, image=Image.open(os.path.join(topomap, image_file)))
-
-    def add_edges(self,adjacency_matrix):
+            self.add_node(i, image=Image.open(os.path.join(topomap_folder, image_file)),count=adjacency_matrix[i][i])
         num_nodes = len(self.nodes())
         for i in range(num_nodes):
             for j in range(num_nodes):
@@ -32,6 +33,41 @@ class Topomap(nx.DiGraph):
                 weight = adjacency_matrix[i][j]
                 if not np.isinf(weight):
                     self.add_edge(i, j, weight=weight)
+
+    def find_path_to_nearest_frontier_node(self, start_node, count=3):
+        # 使用深度优先搜索（DFS）来遍历图
+        visited = set()
+        stack = [(start_node, [start_node])]
+
+        while stack:
+            node, path = stack.pop()
+            if self.nodes[node]['count'] < count:
+                return path  # 找到满足条件的路径
+
+            if node not in visited:
+                visited.add(node)
+                neighbors = list(self.neighbors(node))
+                for neighbor in neighbors:
+                    stack.append((neighbor, path + [neighbor]))
+
+        return None  # 如果没有找到满足条件的路径
+
+    def find_nearest_frontier_node(self, start_node, count=3):
+        # 使用广度优先搜索（BFS）来遍历图
+        visited = set()
+        queue = [start_node]
+
+        while queue:
+            node = queue.pop(0)
+            if self.nodes[node]['count'] < count:
+                return node
+
+            if node not in visited:
+                visited.add(node)
+                neighbors = list(self.neighbors(node))
+                queue.extend(neighbors)
+
+        return None  # 如果没有找到满足条件的节点
     
     def visualize(self,show_image=True):
         pos = nx.circular_layout(self)
