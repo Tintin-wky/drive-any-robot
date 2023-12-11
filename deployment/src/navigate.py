@@ -123,7 +123,7 @@ def main(args: argparse.Namespace):
             for sg_img in topomap[start: end + 1]:
                 transf_obs_img = transform_images(context_queue, model_params["image_size"])
                 transf_sg_img = transform_images(sg_img, model_params["image_size"])
-                dist, waypoint = model(transf_obs_img, transf_sg_img) 
+                dist, waypoint = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
                 # transf_goal_img = transform_images(topomap[-1], model_params["image_size"])
                 # dist, waypoint = model(transf_obs_img, transf_goal_img) 
                 distances.append(to_numpy(dist[0]))
@@ -141,8 +141,8 @@ def main(args: argparse.Namespace):
                 chosen_waypoint[:2] *= (MAX_V / RATE)
             waypoint_msg.data = chosen_waypoint
             waypoint_pub.publish(waypoint_msg)
-            rospy.loginfo(f"Closest node: {closest_node + start} Estimate distance:{distances[closest_node]} \
-                  Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
+            rospy.loginfo(f"Closest node: {closest_node + start} Estimate distance:{distances[closest_node]}")
+            # rospy.loginfo(f"Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
             closest_node += start
             reached_goal = closest_node == goal_node
             goal_pub.publish(reached_goal)
