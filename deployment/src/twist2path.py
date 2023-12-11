@@ -14,7 +14,6 @@ class TwistToPathNode:
 
     def twist_callback(self, twist_msg):
         global v,w,yaw,x,y,t
-        # 获取上一次的姿势（如果有的话）
         if len(self.path.poses) == 0:
             v = 0
             w = 0
@@ -26,8 +25,7 @@ class TwistToPathNode:
         # 根据收到的twist消息更新姿势
         dt = (rospy.Time.now() - t).to_sec()
         x += v * np.cos(yaw) * dt
-        y += w * np.sin(yaw) * dt
-        rospy.loginfo(f'v:{v} w:{w} yaw:{yaw}')
+        y += v * np.sin(yaw) * dt
         v = twist_msg.linear.x
         w = twist_msg.angular.z
         yaw += twist_msg.angular.z * dt

@@ -4,10 +4,14 @@ from typing import Tuple
 
 # ROS
 import rospy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped
+import tf.transformations as tf_trans
+from nav_msgs.msg import Path
 from std_msgs.msg import Float32MultiArray, Bool
 
 vel_msg = Twist()
+path = Path()
+path.header.frame_id = 'odom'
 reached_goal = False
 CONFIG_PATH = "../config/robot.yaml"
 with open(CONFIG_PATH, "r") as f:
@@ -52,7 +56,37 @@ def pd_controller(waypoint: np.ndarray) -> Tuple[float]:
 
 def callback_drive(waypoint_msg: Float32MultiArray):
 	"""Callback function for the waypoint subscriber"""
-	global vel_msg
+	global vel_msg,path
+
+	global x,y,yaw,t
+	if len(path.poses) == 0:
+		yaw = 0
+		x = 0
+		y = 0
+		t = rospy.Time.now()
+	else:
+		# 根据收到的twist消息更新姿势
+		dt = (rospy.Time.now() - t).to_sec()
+		yaw += 0.5 * vel_msg.angular.z * dt
+		x += vel_msg.linear.x * np.cos(yaw) * dt
+		y += vel_msg.linear.x * np.sin(yaw) * dt
+		yaw += 0.5 * vel_msg.angular.z * dt
+		t = rospy.Time.now()
+
+	pose = PoseStamped()
+	pose.header.stamp =rospy.Time.now()
+	pose.header.frame_id = path.header.frame_id
+	pose.pose.position.x = x
+	pose.pose.position.y = y
+	orientation = tf_trans.quaternion_from_euler(0, 0, yaw)
+	pose.pose.orientation.x = orientation[0]
+	pose.pose.orientation.y = orientation[1]
+	pose.pose.orientation.z = orientation[2]
+	pose.pose.orientation.w = orientation[3]
+
+	# 将新的PoseStamped添加到Path消息中
+	path.poses.append(pose)
+	
 	waypoint = waypoint_msg.data
 	v, w = pd_controller(waypoint)
 	vel_msg = Twist()
@@ -71,12 +105,14 @@ def main():
 	rospy.init_node("PD_CONTROLLER", anonymous=False)
 	waypoint_sub = rospy.Subscriber("/waypoint", Float32MultiArray, callback_drive, queue_size=1)
 	reached_goal_sub = rospy.Subscriber("/topoplan/reached_goal", Bool, callback_reached_goal, queue_size=1)
+	path_pub = rospy.Publisher('/path', Path, queue_size=10)
 	vel_out = rospy.Publisher(VEL_TOPIC, Twist, queue_size=1)
 	rate = rospy.Rate(RATE)
 	rospy.loginfo("Registered with master node. Waiting for waypoints...")
 	while not rospy.is_shutdown():
-		global vel_msg
+		global vel_msg,path
 		vel_out.publish(vel_msg)
+		path_pub.publish(path)
 		if reached_goal:
 			vel_msg = Twist()
 			vel_out.publish(vel_msg)
