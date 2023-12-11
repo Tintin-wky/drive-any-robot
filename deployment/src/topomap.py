@@ -8,11 +8,6 @@ class Topomap(nx.DiGraph):
     def __init__(self):
         super().__init__()
 
-    def update(self,node,image,weight):
-        self.add_node(node, image=image)
-        if node != 0:
-            self.add_edge(node-1, node, weight=weight)
-
     def get_adjacency_matrix(self):
         num_nodes = len(self.nodes())
         adjacency_matrix = np.full((num_nodes, num_nodes), np.inf, dtype=float)
@@ -31,7 +26,9 @@ class Topomap(nx.DiGraph):
     def add_edges(self,adjacency_matrix):
         num_nodes = len(self.nodes())
         for i in range(num_nodes):
-            for j in range(i + 1, num_nodes):
+            for j in range(num_nodes):
+                if i == j:
+                    continue
                 weight = adjacency_matrix[i][j]
                 if not np.isinf(weight):
                     self.add_edge(i, j, weight=weight)
@@ -56,7 +53,7 @@ class Topomap(nx.DiGraph):
         edge_labels = nx.get_edge_attributes(self, 'weight')
         edge_labels = {(k[0], k[1]): f"{v:.2f}" for k, v in edge_labels.items()}
 
-        nx.draw_networkx_edges(self, pos, width=edge_weights)
-        # nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
+        nx.draw_networkx_edges(self, pos)
+        nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
         plt.axis('off')
         plt.show()

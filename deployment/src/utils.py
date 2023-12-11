@@ -75,7 +75,7 @@ def msg_to_pil(msg: Image) -> PILImage.Image:
 
 def pil_to_msg(pil_img: PILImage.Image) -> Image:
     img = np.asarray(pil_img)
-    ros_image = Image(encoding="mono8")
+    ros_image = Image(encoding="rgb8")
     ros_image.height, ros_image.width, _ = img.shape
     ros_image.data = img.ravel().tobytes()
     ros_image.step = ros_image.width

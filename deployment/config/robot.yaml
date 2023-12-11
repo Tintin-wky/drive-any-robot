@@ -1,8 +1,8 @@
 # linear and angular speed limits for the robot
-max_v: 0.5 # m/s
-max_w: 0.3 # rad/s
+max_v: 1.0 # m/s
+max_w: 0.5 # rad/s
 # observation rate fo the robot
-frame_rate: 10 # Hz
+frame_rate: 5 # Hz
 
 # topic names (modify for different robots/nodes)
 vel_navi_topic: "/cmd_vel"

@@ -16,6 +16,7 @@ def main(args: argparse.Namespace):
     topomap = Topomap()
     topomap.load_nodes(image_folder)
     topomap.add_edges(adjacency_matrix)
+    print(topomap.get_adjacency_matrix())
     topomap.visualize()
 
 if __name__ == "__main__":
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--name",
         "-n",
-        default="test",
+        default="topomap",
         type=str,
         help="name of your topomap (default: topomap)",
     )

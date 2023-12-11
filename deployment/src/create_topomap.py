@@ -44,7 +44,8 @@ def main(args: argparse.Namespace):
             start_time = t.to_sec()
             obs_img = Image.open(io.BytesIO(msg.data))
             obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
-            topomap.update(i,obs_img,args.dt)
+            topomap.add_node(i, image=obs_img)
+            topomap.add_edge(i-1,i,weight=args.dt)
             i+=1
             print("saved image", i)
 
