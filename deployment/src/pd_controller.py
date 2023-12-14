@@ -163,7 +163,6 @@ def callback_drive(waypoint_msg: Float32MultiArray):
 	vel_msg = Twist()
 	vel_msg.linear.x = v
 	vel_msg.angular.z = w
-	# rospy.loginfo(f"publishing new vel: v:{v} w:{w}")
 
 
 def callback_reached_goal(reached_goal_msg: Bool):
@@ -182,13 +181,14 @@ def main():
 	rospy.loginfo("Registered with master node. Waiting for waypoints...")
 	while not rospy.is_shutdown():
 		global vel_msg,path
-		vel_out.publish(vel_msg)
 		path_pub.publish(path)
 		if reached_goal:
-			vel_msg = Twist()
-			vel_out.publish(vel_msg)
+			vel_out.publish(Twist())
 			rospy.loginfo("Reached goal! Stopping...")
-			return
+			# return
+		else:
+			vel_out.publish(vel_msg)
+			rospy.loginfo(f"publishing new vel: v:{vel_msg.linear.x} w:{vel_msg.angular.z}")
 		rate.sleep()
 	
 

@@ -4,16 +4,12 @@ train/gnm_train/old_notebooks/
 train/datasets/*
 train/gnm_train/data/data_splits/*
 
-deployment/model_weights/*
-deployment/topomaps/images/*
-deployment/topomaps/bags/*
-deployment/navigate/bags/*
-
 .vscode/*
 */.vscode/*
 *.bag
 *.png
 *.avi
+*.mkv
 recon_release/
 train/recon/
 train/gnm_train/data/data_splits

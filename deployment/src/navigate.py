@@ -114,23 +114,22 @@ def main(args: argparse.Namespace):
             distance=to_numpy(dist[0])
             waypoint=to_numpy(waypoints[0][args.waypoint])
             rospy.loginfo(f"Estimate distance:{distance}")
-            waypoint_msg = Float32MultiArray()
-            if bool(distance < args.close_threshold):
-                rospy.loginfo("Reach goal")
-                waypoint_msg.data = np.array([0,0])
-            else:
-                if model_params["normalize"]:
-                    waypoint_msg.data = waypoint
-                    waypoint[:2] *= (MAX_V / RATE)
-                waypoint_msg.data = waypoint
+
+            reached_goal = bool(distance < args.close_threshold)
             goal_pub.publish(reached_goal)
+
+            waypoint_msg = Float32MultiArray()
+            if model_params["normalize"]:
+                waypoint[:2] *= (MAX_V / RATE)
+            waypoint_msg.data = waypoint
             waypoint_pub.publish(waypoint_msg)
+
             rate.sleep()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Code to run GNMs on the locobot")
+        description="Code to run GNMs on the classbot")
     parser.add_argument(
         "--name",
         "-n",
