@@ -15,10 +15,10 @@ def main(args: argparse.Namespace):
     
     topomap = Topomap()
     topomap.load(image_folder,adjacency_matrix)
-    print(topomap.get_adjacency_matrix())
-    frontier_node = topomap.find_nearest_frontier_node(7,count=2)
-    sorted_node = sorted(topomap.nodes(), key=lambda n: topomap.nodes[n]['count'])
-    print(frontier_node)
+    # print(topomap.get_adjacency_matrix())
+    # frontier_node = topomap.find_nearest_frontier_node(7,count=2)
+    # sorted_node = sorted(topomap.nodes(), key=lambda n: topomap.nodes[n]['count'])
+    # print(frontier_node)
     topomap.visualize()
 
 if __name__ == "__main__":
