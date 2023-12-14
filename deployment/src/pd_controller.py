@@ -163,7 +163,7 @@ def callback_drive(waypoint_msg: Float32MultiArray):
 	vel_msg = Twist()
 	vel_msg.linear.x = v
 	vel_msg.angular.z = w
-	rospy.loginfo(f"publishing new vel: v:{v} w:{w}")
+	# rospy.loginfo(f"publishing new vel: v:{v} w:{w}")
 
 
 def callback_reached_goal(reached_goal_msg: Bool):

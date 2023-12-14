@@ -117,8 +117,10 @@ def main(args: argparse.Namespace):
             waypoint_msg = Float32MultiArray()
             if bool(distance < args.close_threshold):
                 rospy.loginfo("Reach goal")
+                waypoint_msg.data = np.array([0,0])
             else:
                 if model_params["normalize"]:
+                    waypoint_msg.data = waypoint
                     waypoint[:2] *= (MAX_V / RATE)
                 waypoint_msg.data = waypoint
             goal_pub.publish(reached_goal)
