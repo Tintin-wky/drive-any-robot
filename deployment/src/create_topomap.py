@@ -69,9 +69,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--name",
         "-n",
-        default="test",
+        default="topomap",
         type=str,
-        help="name of your topomap (default: test)",
+        help="name of your topomap (default: topomap)",
     )
     parser.add_argument(
         "--dt",
