@@ -62,7 +62,7 @@ if __name__ == '__main__':
         "-i",
         default=-1,
         type=int,
-        help="duration between goals",
+        help="the id of chosen goal",
     )
     args = parser.parse_args()
     main(args)

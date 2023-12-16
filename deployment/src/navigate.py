@@ -2,6 +2,8 @@
 import rospy
 from sensor_msgs.msg import CompressedImage,Image
 from std_msgs.msg import Bool, Float32MultiArray
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Pose
 
 import torch
 from PIL import Image as PILImage
@@ -25,8 +27,10 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
+RATE = 20
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 GOAL_IMAGE_TOPIC = "/goal/image"
+ODOM_TOPIC = "/odom_chassis"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -46,12 +50,14 @@ model_params = {
 # GLOBALS
 context_queue = []
 goal_images = []
+odom = Pose()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 def callback_obs(msg):
     obs_img = PILImage.open(io.BytesIO(msg.data))
+    global context_queue
     if len(context_queue) < model_params["context"] + 1:
         context_queue.append(obs_img)
     else:
@@ -62,6 +68,9 @@ def callback_goal(msg):
     global goal_images
     goal_images.append(msg_to_pil(msg))
     
+def callback_odom(msg: Odometry):
+    global odom
+    odom=msg.pose.pose
 
 def main(args: argparse.Namespace):
 
@@ -98,13 +107,17 @@ def main(args: argparse.Namespace):
         IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
     image_goal_msg = rospy.Subscriber(
         GOAL_IMAGE_TOPIC, Image, callback_goal, queue_size=1)
+    odom_msg = rospy.Subscriber(
+        ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
+    odom_distance_pub = rospy.Publisher(
+        "/odom_distance", Float32MultiArray, queue_size=1)
     waypoint_pub = rospy.Publisher(
         "/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
 
     reached_goal = False
-
+    data = []
     # navigation loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"] and len(goal_images) != 0:
@@ -113,7 +126,11 @@ def main(args: argparse.Namespace):
             dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
             distance=to_numpy(dist[0])
             waypoint=to_numpy(waypoints[0][args.waypoint])
-            rospy.loginfo(f"Estimate distance:{distance}")
+            rospy.loginfo(f"Estimate distance:{distance.item():.2f} x:{odom.position.x:.2f} y {odom.position.y:.2f}")
+
+            odom_distance_msg=Float32MultiArray()
+            odom_distance_msg.data=[distance,odom.position.x,odom.position.y]
+            odom_distance_pub.publish(odom_distance_msg)
 
             reached_goal = bool(distance < args.close_threshold)
             goal_pub.publish(reached_goal)
@@ -131,13 +148,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Code to run GNMs on the classbot")
     parser.add_argument(
-        "--name",
-        "-n",
-        default="topomap",
-        type=str,
-        help="topomap name",
-    )
-    parser.add_argument(
         "--model",
         "-m",
         default="gnm_large",
@@ -153,28 +163,12 @@ if __name__ == "__main__":
         localizing to it (default: 3)""",
     )
     parser.add_argument(
-        "--radius",
-        "-r",
-        default=2,
-        type=int,
-        help="""temporal number of locobal nodes to look at in the topopmap for
-        localization (default: 2)""",
-    )
-    parser.add_argument(
         "--waypoint",
         "-w",
         default=2, # close waypoints exihibit straight line motion (the middle waypoint is a good default)
         type=int,
         help=f"""index of the waypoint used for navigation (between 0 and 4 or 
         how many waypoints your model predicts) (default: 2)""",
-    )
-    parser.add_argument(
-        "--goal-node",
-        "-g",
-        default=-1,
-        type=int,
-        help="""goal node index in the topomap (if -1, then the goal node is 
-        the last node in the topomap) (default: -1)""",
     )
     args = parser.parse_args()
     print(f"Using {device}")
