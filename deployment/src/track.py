@@ -2,6 +2,8 @@
 import rospy
 from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Pose
 
 import torch
 from PIL import Image as PILImage
@@ -27,6 +29,7 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
+ODOM_TOPIC = "/odom_chassis"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -45,6 +48,7 @@ model_params = {
 
 # GLOBALS
 context_queue = []
+odom = Pose()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -56,7 +60,10 @@ def callback_obs(msg):
     else:
         context_queue.pop(0)
         context_queue.append(obs_img)
-    
+
+def callback_odom(msg: Odometry):
+    global odom
+    odom=msg.pose.pose   
 
 def main(args: argparse.Namespace):
     # load topomap
@@ -100,6 +107,10 @@ def main(args: argparse.Namespace):
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(
         IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
+    odom_msg = rospy.Subscriber(
+        ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
+    odom_distance_pub = rospy.Publisher(
+        "/odom_distance", Float32MultiArray, queue_size=1)
     waypoint_pub = rospy.Publisher(
         "/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
@@ -143,6 +154,9 @@ def main(args: argparse.Namespace):
             waypoint_pub.publish(waypoint_msg)
             rospy.loginfo(f"Closest node: {closest_node + start} Estimate distance:{distances[closest_node]}")
             # rospy.loginfo(f"Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
+            odom_distance_msg=Float32MultiArray()
+            odom_distance_msg.data=[distances[closest_node],odom.position.x,odom.position.y]
+            odom_distance_pub.publish(odom_distance_msg)
             closest_node += start
             reached_goal = closest_node == goal_node
             goal_pub.publish(reached_goal)

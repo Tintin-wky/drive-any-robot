@@ -117,7 +117,6 @@ def main(args: argparse.Namespace):
     rospy.loginfo("Registered with master node. Waiting for image observations...")
 
     reached_goal = False
-    data = []
     # navigation loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"] and len(goal_images) != 0:
