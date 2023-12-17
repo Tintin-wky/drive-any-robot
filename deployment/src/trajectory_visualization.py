@@ -5,19 +5,19 @@ from tqdm import tqdm
 
 ODOM_TOPIC = "/odom_chassis"
 # indoor
-# BAG_PATH_LIST = ["../topomaps/bags/raw/test1_2023-12-14-17-06-24.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702544973_2023-12-14-17-09-34.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702545079_2023-12-14-17-11-20.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702545144_2023-12-14-17-12-25.bag", \
-#            ] 
-# outdoor
-BAG_PATH_LIST = ["../topomaps/bags/raw/test2_2023-12-14-17-31-54.bag", \
-                 "../topomaps/bags/navigate/gnm_classbot_1702546523_2023-12-14-17-35-24.bag", \
-                 "../topomaps/bags/navigate/gnm_classbot_1702546737_2023-12-14-17-38-58.bag", \
-                 "../topomaps/bags/navigate/gnm_classbot_1702546849_2023-12-14-17-40-50.bag", \
-                 "../topomaps/bags/navigate/gnm_classbot_1702547003_2023-12-14-17-43-24.bag", \
-                 "../topomaps/bags/navigate/gnm_classbot_1702547137_2023-12-14-17-45-38.bag", \
+BAG_PATH_LIST = ["../topomaps/bags/raw/test1_2023-12-14-17-06-24.bag", \
+                 "../topomaps/bags/navigate/gnm_classbot_1702544973_2023-12-14-17-09-34.bag", \
+                 "../topomaps/bags/navigate/gnm_classbot_1702545079_2023-12-14-17-11-20.bag", \
+                 "../topomaps/bags/navigate/gnm_classbot_1702545144_2023-12-14-17-12-25.bag", \
            ] 
+# outdoor
+# BAG_PATH_LIST = ["../topomaps/bags/raw/test2_2023-12-14-17-31-54.bag", \
+#                  "../topomaps/bags/navigate/gnm_classbot_1702546523_2023-12-14-17-35-24.bag", \
+#                  "../topomaps/bags/navigate/gnm_classbot_1702546737_2023-12-14-17-38-58.bag", \
+#                  "../topomaps/bags/navigate/gnm_classbot_1702546849_2023-12-14-17-40-50.bag", \
+#                  "../topomaps/bags/navigate/gnm_classbot_1702547003_2023-12-14-17-43-24.bag", \
+#                  "../topomaps/bags/navigate/gnm_classbot_1702547137_2023-12-14-17-45-38.bag", \
+#            ] 
 
 def main():
     rospy.init_node("trajectory_visualization", anonymous=False)

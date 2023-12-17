@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-
-# ---------------------------------------------------
 import rosbag
 import cv2
 from sensor_msgs.msg import CompressedImage
@@ -34,10 +31,10 @@ def convert_compressed_images_to_video(input_bag, output_video, compressed_topic
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert compressed image messages in a ROS bag to a video")
-    parser.add_argument("input_bag", help="Input ROS bag file")
-    parser.add_argument("output_video", help="Output video file")
-    parser.add_argument("compressed_topic", help="Compressed image topic in the bag")
-    parser.add_argument("--frame_rate", type=int, default=30, help="Frame rate for the output video")
+    parser.add_argument("--input_bag", "-i", help="Input ROS bag file")
+    parser.add_argument("--output_video", "-o", help="Output video file")
+    parser.add_argument("--compressed_topic", default="/camera/left/image_raw/compressed",type=str,help="Compressed image topic in the bag")
+    parser.add_argument("--frame_rate", type=int, default=24, help="Frame rate for the output video")
 
     args = parser.parse_args()
 
