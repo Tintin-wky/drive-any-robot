@@ -1,17 +1,13 @@
 import numpy as np
 import yaml
 from typing import Tuple
-import math
 
 # ROS
 import rospy
-from geometry_msgs.msg import Twist, PoseStamped
-from nav_msgs.msg import Path
+from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32MultiArray, Bool
 
 vel_msg = Twist()
-path = Path()
-path.header.frame_id = 'odom'
 reached_goal = False
 CONFIG_PATH = "../config/robot.yaml"
 with open(CONFIG_PATH, "r") as f:
@@ -73,13 +69,11 @@ def main():
 	rospy.init_node("PD_CONTROLLER", anonymous=False)
 	waypoint_sub = rospy.Subscriber("/waypoint", Float32MultiArray, callback_drive, queue_size=1)
 	reached_goal_sub = rospy.Subscriber("/topoplan/reached_goal", Bool, callback_reached_goal, queue_size=1)
-	path_pub = rospy.Publisher('/path', Path, queue_size=10)
 	vel_out = rospy.Publisher(VEL_TOPIC, Twist, queue_size=1)
 	rate = rospy.Rate(RATE)
 	rospy.loginfo("Registered with master node. Waiting for waypoints...")
 	while not rospy.is_shutdown():
-		global vel_msg,path
-		path_pub.publish(path)
+		global vel_msg
 		if reached_goal:
 			vel_out.publish(Twist())
 			rospy.loginfo("Reached goal! Stopping...")
