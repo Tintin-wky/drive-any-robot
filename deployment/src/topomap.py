@@ -3,10 +3,39 @@ import numpy as np
 from PIL import Image
 import os
 import pickle
+import shutil
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Quaternion,Pose
+
+TOPOMAP_IMAGES_DIR = "../topomaps/images"
 TOPOMAPS="../topomaps/topomaps.pkl"
+
+def remove_files_in_dir(dir_path: str):
+    for f in os.listdir(dir_path):
+        file_path = os.path.join(dir_path, f)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print("Failed to delete %s. Reason: %s" % (file_path, e)) 
+
+def quaternion_to_euler(orientation:Quaternion):
+    return Rotation.from_quat([orientation.x, orientation.y, orientation.z, orientation.w]).as_euler('xyz')
+
+def euler_to_quaternion(euler:np.ndarray):
+    return Rotation.from_euler('xyz', euler).as_quat()
+
+def offset_calculate(pose1:Pose,pose2:Pose):
+    dx = pose2.position.x-pose1.position.x
+    dy = pose2.position.y-pose1.position.y
+    dyaw = (quaternion_to_euler(pose2.orientation))[2] - (quaternion_to_euler(pose1.orientation))[2]
+    dyaw = (dyaw + np.pi) % (2 * np.pi) - np.pi 
+    return {'dx':dx, 'dy':dy, 'dyaw':dyaw}
+
 class Topomap(nx.DiGraph):
     def __init__(self):
         super().__init__()
@@ -36,23 +65,23 @@ class Topomap(nx.DiGraph):
     def save(self,name):
         with open(TOPOMAPS, 'wb') as file:
             pickle.dump(dict([(name,self)]), file)
+        topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, name)
+        if not os.path.isdir(topomap_name_dir):
+            os.makedirs(topomap_name_dir)
+        else:
+            print(f"{topomap_name_dir} already exists. Removing previous images...")
+            remove_files_in_dir(topomap_name_dir)
+        for node in tqdm(self.nodes(),total=self.number_of_nodes(), desc="Saving"):
+            image = self.nodes[node]['image']
+            image.save(os.path.join(topomap_name_dir, f"{node}.png"))
+
 
     def add_node(self, node_for_adding, **attr):
         count = 1
         return super().add_node(node_for_adding, count=count ,**attr)
     
-    def quaternion_to_euler(self,orientation:Quaternion):
-        return Rotation.from_quat([orientation.x, orientation.y, orientation.z, orientation.w]).as_euler('xyz')
-
-    def offset_calculate(self,pose1:Pose,pose2:Pose):
-        dx = pose2.position.x-pose1.position.x
-        dy = pose2.position.y-pose1.position.y
-        dyaw = (self.quaternion_to_euler(pose2.orientation))[2] - (self.quaternion_to_euler(pose1.orientation))[2]
-        dyaw = (dyaw + np.pi) % (2 * np.pi) - np.pi 
-        return {'dx':dx, 'dy':dy, 'dyaw':dyaw}
-    
     def add_edge(self, u_of_edge, v_of_edge, **attr):
-        offset = self.offset_calculate(pose1=self.nodes[u_of_edge]['pose'], pose2=self.nodes[v_of_edge]['pose'])
+        offset = offset_calculate(pose1=self.nodes[u_of_edge]['pose'], pose2=self.nodes[v_of_edge]['pose'])
         return super().add_edge(u_of_edge, v_of_edge, offset=offset,**attr)
 
     def update_node(self,node,image,pose):
@@ -60,14 +89,14 @@ class Topomap(nx.DiGraph):
 
     def loopback(self,node:int,newpose:Pose,num_nodes:int):
         pose = self.nodes[node]['pose']
-        offset = self.offset_calculate(pose1=pose,pose2=newpose)
+        offset = offset_calculate(pose1=pose,pose2=newpose)
         for node in range(num_nodes):
             self.nodes[node]['pose'].position.x += offset['dx']
             self.nodes[node]['pose'].position.y += offset['dy']
-            yaw = self.quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
+            yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
             yaw += offset['dyaw']
             yaw = (yaw + np.pi) % (2 * np.pi) - np.pi 
-            quaternion = Rotation.from_euler('xyz', [0, 0, yaw]).as_quat()
+            quaternion = euler_to_quaternion([0, 0, yaw])
             self.nodes[node]['pose'].orientation.x = quaternion[0]
             self.nodes[node]['pose'].orientation.y = quaternion[1]
             self.nodes[node]['pose'].orientation.z = quaternion[2]
@@ -91,41 +120,6 @@ class Topomap(nx.DiGraph):
             if distance < area:
                 neighbors.add(node)
         return neighbors
-        
-    def find_path_to_nearest_frontier_node(self, start_node, count=3):
-        # 使用深度优先搜索（DFS）来遍历图
-        visited = set()
-        stack = [(start_node, [start_node])]
-
-        while stack:
-            node, path = stack.pop()
-            if self.nodes[node]['count'] < count:
-                return path  # 找到满足条件的路径
-
-            if node not in visited:
-                visited.add(node)
-                neighbors = list(self.neighbors(node))
-                for neighbor in neighbors:
-                    stack.append((neighbor, path + [neighbor]))
-
-        return None  # 如果没有找到满足条件的路径
-
-    def find_nearest_frontier_node(self, start_node, count=3):
-        # 使用广度优先搜索（BFS）来遍历图
-        visited = set()
-        queue = [start_node]
-
-        while queue:
-            node = queue.pop(0)
-            if self.nodes[node]['count'] < count:
-                return node
-
-            if node not in visited:
-                visited.add(node)
-                neighbors = list(self.neighbors(node))
-                queue.extend(neighbors)
-
-        return None  # 如果没有找到满足条件的节点
     
     def visualize(self,show_image=True,show_distance=True):
         fig, ax = plt.subplots()
