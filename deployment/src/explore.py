@@ -2,14 +2,13 @@
 import rospy
 from sensor_msgs.msg import Image,CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Pose
 
 import torch
-import tkinter as tk
-from PIL import ImageTk
 from PIL import Image as PILImage
 import numpy as np
 import os
-import matplotlib.pyplot as plt
 import argparse
 import yaml
 
@@ -17,7 +16,6 @@ import yaml
 from utils import to_numpy, transform_images, load_model,pil_to_msg
 import pickle
 import shutil
-import random
 import io
 from topomap import Topomap
 
@@ -34,10 +32,10 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-DESTINATION_DOMAIN = 3
+ODOM_TOPIC = "/odom_chassis"
 DESTINATION_PATH = "../topomaps/destination"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAP_MATRIX = "../topomaps/matrix.pkl"
+TOPOMAPS="../topomaps/topomaps.pkl"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -59,6 +57,8 @@ print("Using device:", device)
 # GLOBALS
 context_queue = []
 obs_img = PILImage.Image()
+pose = Pose()
+
 def callback_obs(msg):
     global last_message_time
     last_message_time = rospy.get_time()
@@ -69,6 +69,10 @@ def callback_obs(msg):
     else:
         context_queue.pop(0)
         context_queue.append(obs_img)
+
+def callback_odom(msg: Odometry):
+    global pose
+    pose=msg.pose.pose
 
 def remove_files_in_dir(dir_path: str):
     for f in os.listdir(dir_path):
@@ -113,18 +117,28 @@ def main(args: argparse.Namespace):
     )
     model.eval()
 
+    # load topomaps
     topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, args.name)
     if not os.path.isdir(topomap_name_dir):
         os.makedirs(topomap_name_dir)
+        topomap=Topomap()
     else:
-        print(f"{topomap_name_dir} already exists. Removing previous images...")
-        remove_files_in_dir(topomap_name_dir)
+        if args.restart:
+            print(f"{topomap_name_dir} already exists. Removing previous images...")
+            remove_files_in_dir(topomap_name_dir)
+            topomap=Topomap()
+        else:
+            with open(TOPOMAPS, 'rb') as file:
+                topomap = pickle.load(file)[args.name]
+            topomap.reset()
 
     # ROS
     rospy.init_node("TOPOPLAN", anonymous=False)
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(
         IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
+    odom_msg = rospy.Subscriber(
+        ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
     waypoint_pub = rospy.Publisher(
         "/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
@@ -133,12 +147,12 @@ def main(args: argparse.Namespace):
     rospy.loginfo("Registered with master node. Waiting for image observations...")
     
     reached_goal = False
-    i = 0
+    i = topomap.number_of_nodes()
     temporal_count = 0
-    topomap=Topomap()
-    on_frontier = True
-    path_to_frontier = []
-    j = 0
+    # on_frontier = True
+    # path_to_frontier = []
+    path = []
+    last_node = None
     
     # exploration loop
     while not rospy.is_shutdown():
@@ -155,85 +169,102 @@ def main(args: argparse.Namespace):
                 waypoint[:2] *= (MAX_V / RATE)
             waypoint_msg.data = waypoint
             waypoint_pub.publish(waypoint_msg)
-            # rospy.loginfo(f"Estimate distance:{distance}")
-            # rospy.loginfo(f"Next waypoint: dx:{waypoint[0]} dy:{waypoint[1]} ")
 
-            check_distances = []
-            check_waypoints = []
-            for node in range(i):
-                check_img= PILImage.open(os.path.join(topomap_name_dir, f"{node}.png"))
-                transf_check_img = transform_images(check_img, model_params["image_size"])
-                dist, waypoints = model(transf_obs_img.to(device), transf_check_img.to(device)) 
-                check_distances.append(to_numpy(dist[0]))
-                check_waypoints.append(to_numpy(waypoints[0]))
-            if i != 0:
-                closest_node = np.argmin(check_distances)
-                # if check_distances[closest_node] < args.close_threshold * 3:
-                rospy.loginfo(f"closest node: {closest_node} distance: {check_distances[closest_node]}")
-            else:
-                closest_node = 0
-                last_node = 0
-            if  closest_node != last_node and check_distances[closest_node] < args.close_threshold:
-                topomap.nodes[closest_node]['count'] += 1
-                on_frontier = False if topomap.nodes[closest_node]['count'] >= 3 else True
-                if on_frontier == False:
-                    path_to_frontier = topomap.find_path_to_nearest_frontier_node(closest_node,count=3)
-                    rospy.loginfo(f"navigate to {path_to_frontier[-1]}")
-                topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
-                rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
-                last_node = closest_node
-                temporal_count = 0
-            elif temporal_count % (args.dt*RATE) == 0: 
-                obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
-                rospy.loginfo(f"saved image {i}")
+            if i == 0:
+                if args.save:
+                    obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
+                    rospy.loginfo(f"saved image {i}")
                 closest_node = i
-                on_frontier = True
-                topomap.add_node(closest_node, image=obs_img,count=0)
-                if last_node != closest_node:
-                    topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
-                    rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                # on_frontier = True
+                topomap.add_node(closest_node, image=obs_img, pose=pose)
                 last_node = i
                 i += 1
                 temporal_count = 0
+            else:
+                check_distances = []
+                check_waypoints = []
+                nodes = []
+                for node in topomap.neighbors(last_node,args.area):
+                    check_img= topomap.nodes[node]['image']
+                    transf_check_img = transform_images(check_img, model_params["image_size"])
+                    dist, waypoints = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                    check_distances.append(to_numpy(dist[0]))
+                    check_waypoints.append(to_numpy(waypoints[0]))
+                    nodes.append(node)
+                closest_node = nodes[np.argmin(check_distances)]
+                closest_distance = check_distances[np.argmin(check_distances)]
+                rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance}")
+                if  closest_distance < args.close_threshold:
+                    # if topomap.loop_back == False and closest_node in range(init_nodes):
+                    #     topomap.loopback(node=closest_node,newpose=pose,num_nodes=init_nodes)
+                    #     rospy.loginfo("encounter the node on existed topomap")
+                    if last_node is None:
+                        last_node = closest_node
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
+                    if last_node != closest_node:
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
+                        # on_frontier = False if topomap.nodes[closest_node]['count'] >= 3 else True
+                        # if on_frontier == False:
+                        #     path_to_frontier = topomap.find_path_to_nearest_frontier_node(closest_node,count=3)
+                        #     rospy.loginfo(f"navigate to {path_to_frontier[-1]}")
+                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                        topomap.update_node(closest_node,image=obs_img, pose=pose)
+                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                        last_node = closest_node
+                        temporal_count = 0
+                elif temporal_count % (args.dt*RATE) == 0: 
+                    if args.save:
+                        obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
+                        rospy.loginfo(f"saved image {i}")
+                    closest_node = i
+                    path.append(closest_node)
+                    # on_frontier = True
+                    topomap.add_node(closest_node, image=obs_img, pose=pose)
+                    if last_node is None:
+                        last_node = closest_node
+                    if last_node != closest_node:
+                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    last_node = i
+                    i += 1
+                    temporal_count = 0
             temporal_count += 1
         
-            closet_node_image = PILImage.open(os.path.join(topomap_name_dir, f"{closest_node}.png"))
-            last_node_image = PILImage.open(os.path.join(topomap_name_dir, f"{last_node}.png"))
-            closest_node_pub.publish(pil_to_msg(closet_node_image))
-            last_node_pub.publish(pil_to_msg(last_node_image))
+            # closet_node_image = PILImage.open(os.path.join(topomap_name_dir, f"{closest_node}.png"))
+            # last_node_image = PILImage.open(os.path.join(topomap_name_dir, f"{last_node}.png"))
+            # closest_node_pub.publish(pil_to_msg(closet_node_image))
+            # last_node_pub.publish(pil_to_msg(last_node_image))
             reached_goal = bool(distance < args.close_threshold)
             goal_pub.publish(reached_goal)
 
             if reached_goal:
                 rospy.loginfo("Reached goal Stopping...")
-                obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
-                rospy.loginfo(f"saved image {i}")
+
+                if args.save:
+                    obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
+                    rospy.loginfo(f"saved image {i}")
                 closest_node = i
-                topomap.add_node(closest_node, image=obs_img,count=0)
+                topomap.add_node(closest_node, image=obs_img, pose=pose)
+                path.append(closest_node)
                 topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
                 last_node = i
                 i += 1
                 temporal_count = 0
-                with open(TOPOMAP_MATRIX, 'wb') as file:
-                    pickle.dump(dict([(args.name,topomap.get_adjacency_matrix())]), file)
-                print(topomap.get_adjacency_matrix())
+
+                print(path)
+                topomap.path.append(path)
+                topomap.save(args.name)
                 topomap.visualize()
                 return
             
             global last_message_time
             if rospy.get_time() - last_message_time > 1:
                 rospy.loginfo("No message received for {} seconds. Exiting...".format(1))
-                obs_img.save(os.path.join(topomap_name_dir, f"{i}.png"))
-                rospy.loginfo(f"saved image {i}")
-                closest_node = i
-                topomap.add_node(closest_node, image=obs_img,count=0)
-                topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
-                last_node = i
-                i += 1
-                temporal_count = 0
-                with open(TOPOMAP_MATRIX, 'wb') as file:
-                    pickle.dump(dict([(args.name,topomap.get_adjacency_matrix())]), file)
-                print(topomap.get_adjacency_matrix())
+                print(path)
+                topomap.path.append(path)
+                topomap.save(args.name)
                 topomap.visualize()
                 return
             
@@ -274,17 +305,30 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dt",
         "-t",
-        default=3,
+        default=5,
         type=float,
-        help=f"time between images sampled from the {IMAGE_TOPIC} topic (default: 5 seconds)",
+        help=f"time between images sampled from the {IMAGE_TOPIC} topic (default: 3 seconds)",
     )
     parser.add_argument(
-        "--radius",
+        "--area",
+        "-a",
+        default=10.,
+        type=float,
+        help="""area range of nearby nodes checked in odom(default: 10)""",
+    )
+    parser.add_argument(
+        "--restart",
         "-r",
-        default=2,
-        type=int,
-        help="""temporal number of locobal nodes to look at in the topopmap for
-        localization (default: 2)""",
+        default=False,
+        type=bool,
+        help="""whether remake the topomap or not (default: Flase)""",
+    )
+    parser.add_argument(
+        "--save",
+        "-s",
+        default=False,
+        type=bool,
+        help="""whether output node image in dirctory or not (default: Flase)""",
     )
     parser.add_argument(
         "--waypoint",

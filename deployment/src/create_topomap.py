@@ -10,7 +10,6 @@ import io
 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAP_MATRIX = "../topomaps/matrix.pkl"
 
 def remove_files_in_dir(dir_path: str):
     for f in os.listdir(dir_path):
@@ -52,8 +51,7 @@ def main(args: argparse.Namespace):
 
     print(f"Topic {IMAGE_TOPIC} not publishing anymore. Shutting down...")
     rospy.signal_shutdown("shutdown")
-    with open(TOPOMAP_MATRIX, 'wb') as file:
-        pickle.dump(dict([(args.name,topomap.get_adjacency_matrix())]), file)
+    topomap.save(args.name)
     bag.close()
 
 if __name__ == "__main__":

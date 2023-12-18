@@ -27,7 +27,7 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
-RATE = 20
+# RATE = 20
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 GOAL_IMAGE_TOPIC = "/goal/image"
 ODOM_TOPIC = "/odom_chassis"
@@ -117,6 +117,7 @@ def main(args: argparse.Namespace):
     rospy.loginfo("Registered with master node. Waiting for image observations...")
 
     reached_goal = False
+    count = 0
     # navigation loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"] and len(goal_images) != 0:
@@ -133,6 +134,13 @@ def main(args: argparse.Namespace):
 
             reached_goal = bool(distance < args.close_threshold)
             goal_pub.publish(reached_goal)
+            # return after a duration after reaching goal
+            if reached_goal:
+                count += 1
+            else:
+                count = 0
+            if count > RATE * 5:
+                return
 
             waypoint_msg = Float32MultiArray()
             if model_params["normalize"]:

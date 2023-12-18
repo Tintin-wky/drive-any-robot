@@ -4,17 +4,13 @@ from topomap import Topomap
 import os
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAP_MATRIX = "../topomaps/matrix.pkl"
+TOPOMAPS="../topomaps/topomaps.pkl"
 
 def main(args: argparse.Namespace):
-    with open(TOPOMAP_MATRIX, 'rb') as file:
-        loaded_data = pickle.load(file)
-
-    image_folder=os.path.join(TOPOMAP_IMAGES_DIR, args.name)
-    adjacency_matrix=loaded_data[args.name]
-    
-    topomap = Topomap()
-    topomap.load(image_folder,adjacency_matrix)
+    with open(TOPOMAPS, 'rb') as file:
+        topomap = pickle.load(file)[args.name]
+    print(topomap.get_adjacency_matrix())
+    print(topomap.path)
     topomap.visualize()
 
 if __name__ == "__main__":
