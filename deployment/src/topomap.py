@@ -106,13 +106,13 @@ class Topomap(nx.DiGraph):
     
     def merge(self,node_reserved,node_replaced):
         # 转移所有指向B的边到A
-        for u, v, data in list(self.in_edges(node_replaced, data=True)):
+        for u, v in list(self.in_edges(node_replaced)):
             if u != node_reserved:  # 避免自环
-                self.add_edge(u, node_reserved, **data)
+                self.add_edge(u, node_reserved)
         # 转移所有从B出发的边到A
-        for u, v, data in list(self.out_edges(node_replaced, data=True)):
+        for u, v in list(self.out_edges(node_replaced)):
             if v != node_reserved:  # 避免自环
-                self.add_edge(node_reserved, v, **data)
+                self.add_edge(node_reserved, v)
         # 删除节点B
         self.remove_node(node_replaced)
 
@@ -133,7 +133,7 @@ class Topomap(nx.DiGraph):
         if self.loop_back is True:
             range_nodes = self.nodes()
         else:
-            range_nodes = [n for n in self.nodes() if  n >= self.last_number_of_nodes] 
+            range_nodes = [n for n in self.nodes() if  n > self.last_number_of_nodes] 
         for node in range_nodes:
             x=self.nodes[node]['pose'].position.x
             y=self.nodes[node]['pose'].position.y
