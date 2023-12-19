@@ -149,6 +149,8 @@ def main(args: argparse.Namespace):
                     rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
                     if closest_distance < args.close_threshold:
                         last_node = closest_node
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
                         topomap.loopback(closest_node,pose)
                         rospy.loginfo("arrive at nodes on the former topomap")
                     else:
@@ -202,7 +204,7 @@ def main(args: argparse.Namespace):
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = closest_node
                     temporal_count = 0
-                elif closest_distance > args.far_threshold:
+                elif closest_distance > args.far_threshold and temporal_count != 0:
                     closest_node = i
                     path.append(closest_node)
                     topomap.add_node(closest_node, image=obs_img, pose=pose)

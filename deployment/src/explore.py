@@ -11,6 +11,7 @@ import numpy as np
 import os
 import argparse
 import yaml
+import random
 
 # UTILS
 from utils import to_numpy, transform_images, load_model,pil_to_msg
@@ -177,13 +178,41 @@ def explore(args: argparse.Namespace):
                     closest_node = np.argmin(check_distances)
                     closest_distance = check_distances[closest_node]
                     rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
-                    if closest_distance > args.close_threshold:
+                    if closest_distance < args.close_threshold:
+                        last_node = closest_node
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
+                        topomap.loopback(closest_node,pose)
+                        rospy.loginfo("arrive at nodes on the former topomap")
+                    else:
                         closest_node = i
                         path.append(closest_node)
                         topomap.add_node(closest_node, image=obs_img, pose=pose)
-                        rospy.loginfo("start create a new topomap")
+                        rospy.loginfo(f"start create a new topomap at node {i}")
                         last_node = closest_node
                         i += 1
+                        temporal_count = 0
+
+                if topomap.loop_back is False:
+                    check_distances = []
+                    check_nodes = [] 
+                    for node in random.sample(range(topomap.last_number_of_nodes),5):
+                        check_img= topomap.nodes[node]['image']
+                        transf_check_img = transform_images(check_img, model_params["image_size"])
+                        dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                        check_distances.append(to_numpy(dist[0]))
+                        check_nodes.append(node)
+                    closest_node = check_nodes[np.argmin(check_distances)]
+                    closest_distance = check_distances[np.argmin(check_distances)]
+                    rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f} sampled_nodes:{check_nodes}")
+                    if closest_distance < args.close_threshold:
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
+                        topomap.loopback(closest_node,pose)
+                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                        rospy.loginfo("arrive at nodes on the former topomap")
+                        last_node = closest_node
                         temporal_count = 0
                         
                 check_distances = []
@@ -206,7 +235,7 @@ def explore(args: argparse.Namespace):
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = closest_node
                     temporal_count = 0
-                elif closest_distance > args.far_threshold:
+                elif closest_distance > args.far_threshold and temporal_count != 0:
                     closest_node = i
                     path.append(closest_node)
                     topomap.add_node(closest_node, image=obs_img, pose=pose)
