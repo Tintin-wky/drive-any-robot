@@ -85,7 +85,7 @@ def remove_files_in_dir(dir_path: str):
         except Exception as e:
             print("Failed to delete %s. Reason: %s" % (file_path, e)) 
 
-def main(args: argparse.Namespace):
+def explore(args: argparse.Namespace):
     # load destination
     destination = args.destination
     goal_img=PILImage.open(destination)
@@ -177,9 +177,9 @@ def main(args: argparse.Namespace):
                 closest_distance = check_distances[np.argmin(check_distances)]
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f} nearby_nodes:{check_nodes}")
                 if  closest_distance < args.close_threshold:
-                    # if topomap.loop_back == False and closest_node in range(init_nodes):
-                    #     topomap.loopback(node=closest_node,newpose=pose,num_nodes=init_nodes)
-                    #     rospy.loginfo("encounter the node on existed topomap")
+                    if topomap.loop_back == False and closest_node in range(topomap.last_number_of_nodes):
+                        topomap.loopback(node=closest_node,newpose=pose,num_nodes=topomap.last_number_of_nodes)
+                        rospy.loginfo("encounter the node on existed topomap")
                     if last_node is None:
                         last_node = closest_node
                         topomap.nodes[closest_node]['count'] += 1
@@ -311,6 +311,7 @@ if __name__ == "__main__":
         how many waypoints your model predicts) (default: 2)""",
     )
     args = parser.parse_args()
+    print(args)
     print(f"Using {device}")
-    main(args)
+    explore(args)
 

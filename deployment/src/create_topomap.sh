@@ -1,22 +1,23 @@
 #!/bin/bash
 
 # Create a new tmux session
-session_name="create_topomap_$(date +%s)"
+session_name="gnm_classbot_$(date +%s)"
 tmux new-session -d -s $session_name
+log="gnm_classbot_$(date +%s)"
 
-# Split the window into three panes
+# Split the window into four panes
 tmux selectp -t 0    # select the first (0) pane
-tmux splitw -v -p 50 # split it into two halves
+tmux splitw -h -p 50 # split it into two halves
 
-# Run roscore in the first pane
+# Run the navigate.py script with command line args in the first pane
 tmux select-pane -t 0
-tmux send-keys "roscore" Enter
-
-# Run the create_topoplan.py script with command line args in the second pane
-tmux select-pane -t 1
 tmux send-keys "conda activate gnm_deployment" Enter
-tmux send-keys "python create_topomap.py --name $1 --rosbag $2" Enter
-tmux send-keys "python topomap_visualization.py --name $1" Enter
+tmux send-keys "python create_trajectory.py $@" Enter
+
+# Change the directory to ../navigate/bags and run the rosbag record command in the second pane
+tmux select-pane -t 1
+tmux send-keys "cd ../topomaps/bags/explore" Enter
+tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis /path -o $log"  # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name
