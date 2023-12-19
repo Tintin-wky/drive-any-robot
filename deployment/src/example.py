@@ -1,6 +1,6 @@
 # ROS
 import rospy
-from sensor_msgs.msg import CompressedImage,Image
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Pose
@@ -19,6 +19,7 @@ from utils import msg_to_pil, to_numpy, transform_images, load_model
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
 
+TOPOMAP_IMAGES_DIR = "../topomaps/images"
 MODEL_WEIGHTS_PATH = "../model_weights"
 ROBOT_CONFIG_PATH ="../config/robot.yaml"
 MODEL_CONFIG_PATH = "../config/models.yaml"
@@ -27,9 +28,7 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
-# RATE = 20
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-GOAL_IMAGE_TOPIC = "/goal/image"
 ODOM_TOPIC = "/odom_chassis"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
@@ -49,7 +48,6 @@ model_params = {
 
 # GLOBALS
 context_queue = []
-goal_images = []
 odom = Pose()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -57,22 +55,26 @@ print("Using device:", device)
 
 def callback_obs(msg):
     obs_img = PILImage.open(io.BytesIO(msg.data))
-    global context_queue
     if len(context_queue) < model_params["context"] + 1:
         context_queue.append(obs_img)
     else:
         context_queue.pop(0)
         context_queue.append(obs_img)
 
-def callback_goal(msg):
-    global goal_images
-    goal_images.append(msg_to_pil(msg))
-    
 def callback_odom(msg: Odometry):
     global odom
-    odom=msg.pose.pose
+    odom=msg.pose.pose   
 
 def main(args: argparse.Namespace):
+    # load topomap
+    topomap_filenames = sorted(os.listdir(os.path.join(
+        TOPOMAP_IMAGES_DIR, args.name)), key=lambda x: int(x.split(".")[0]))
+    topomap_dir = f"{TOPOMAP_IMAGES_DIR}/{args.name}"
+    num_nodes = len(os.listdir(topomap_dir))
+    topomap = []
+    for i in range(num_nodes):
+        image_path = os.path.join(topomap_dir, topomap_filenames[i])
+        topomap.append(PILImage.open(image_path))
 
     # load model parameters
     with open(MODEL_CONFIG_PATH, "r") as f:
@@ -105,8 +107,6 @@ def main(args: argparse.Namespace):
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(
         IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
-    image_goal_msg = rospy.Subscriber(
-        GOAL_IMAGE_TOPIC, Image, callback_goal, queue_size=1)
     odom_msg = rospy.Subscriber(
         ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
     odom_distance_pub = rospy.Publisher(
@@ -116,44 +116,66 @@ def main(args: argparse.Namespace):
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
 
+    closest_node = 0
+    assert -1 <= args.goal_node < len(topomap), "Invalid goal index"
+    if args.goal_node == -1:
+        goal_node = len(topomap) - 1
+    else:
+        goal_node = args.goal_node
     reached_goal = False
-    count = 0
+
     # navigation loop
     while not rospy.is_shutdown():
-        if len(context_queue) > model_params["context"] and len(goal_images) != 0:
-            transf_obs_img = transform_images(context_queue, model_params["image_size"])
-            transf_sg_img = transform_images(goal_images[-1], model_params["image_size"])
-            dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
-            distance=to_numpy(dist[0])
-            waypoint=to_numpy(waypoints[0][args.waypoint])
-            rospy.loginfo(f"Estimate distance:{distance.item():.2f} x:{odom.position.x:.2f} y {odom.position.y:.2f}")
-
-            odom_distance_msg=Float32MultiArray()
-            odom_distance_msg.data=[distance,odom.position.x,odom.position.y]
-            odom_distance_pub.publish(odom_distance_msg)
-
-            reached_goal = bool(distance < args.close_threshold)
-            goal_pub.publish(reached_goal)
-            # return after a duration after reaching goal
-            if reached_goal:
-                count += 1
+        if len(context_queue) > model_params["context"]:
+            start = max(closest_node - args.radius, 0)
+            end = min(closest_node + args.radius, goal_node)
+            distances = []
+            waypoints = []
+            for sg_img in topomap[start: end + 1]:
+                transf_obs_img = transform_images(context_queue, model_params["image_size"])
+                transf_sg_img = transform_images(sg_img, model_params["image_size"])
+                dist, waypoint = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
+                # transf_goal_img = transform_images(topomap[-1], model_params["image_size"])
+                # dist, waypoint = model(transf_obs_img, transf_goal_img) 
+                distances.append(to_numpy(dist[0]))
+                waypoints.append(to_numpy(waypoint[0]))
+            # look for closest node
+            closest_node = np.argmin(distances)
+            # chose subgoal and output waypoints
+            if distances[closest_node] > args.close_threshold:
+                chosen_waypoint = waypoints[closest_node][args.waypoint]
             else:
-                count = 0
-            if count > RATE * 5:
-                return
-
+                chosen_waypoint = waypoints[min(
+                    closest_node + 1, len(waypoints) - 1)][args.waypoint]
             waypoint_msg = Float32MultiArray()
             if model_params["normalize"]:
-                waypoint[:2] *= (MAX_V / RATE)
-            waypoint_msg.data = waypoint
+                chosen_waypoint[:2] *= (MAX_V / RATE)
+            waypoint_msg.data = chosen_waypoint
             waypoint_pub.publish(waypoint_msg)
-
+            rospy.loginfo(f"Closest node: {closest_node + start} Estimate distance:{distances[closest_node]}")
+            # rospy.loginfo(f"Next waypoint: dx:{chosen_waypoint[0]} dy:{chosen_waypoint[1]}")
+            odom_distance_msg=Float32MultiArray()
+            odom_distance_msg.data=[distances[closest_node],odom.position.x,odom.position.y]
+            odom_distance_pub.publish(odom_distance_msg)
+            closest_node += start
+            reached_goal = closest_node == goal_node
+            goal_pub.publish(reached_goal)
+            if reached_goal:
+                rospy.loginfo("Reached goal Stopping...")
+                return
             rate.sleep()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Code to run GNMs on the classbot")
+        description="Code to run GNMs on the locobot")
+    parser.add_argument(
+        "--name",
+        "-n",
+        default="topomap",
+        type=str,
+        help="topomap name",
+    )
     parser.add_argument(
         "--model",
         "-m",
@@ -170,12 +192,28 @@ if __name__ == "__main__":
         localizing to it (default: 3)""",
     )
     parser.add_argument(
+        "--radius",
+        "-r",
+        default=2,
+        type=int,
+        help="""temporal number of locobal nodes to look at in the topopmap for
+        localization (default: 2)""",
+    )
+    parser.add_argument(
         "--waypoint",
         "-w",
         default=2, # close waypoints exihibit straight line motion (the middle waypoint is a good default)
         type=int,
         help=f"""index of the waypoint used for navigation (between 0 and 4 or 
         how many waypoints your model predicts) (default: 2)""",
+    )
+    parser.add_argument(
+        "--goal-node",
+        "-g",
+        default=-1,
+        type=int,
+        help="""goal node index in the topomap (if -1, then the goal node is 
+        the last node in the topomap) (default: -1)""",
     )
     args = parser.parse_args()
     print(f"Using {device}")

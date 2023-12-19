@@ -74,17 +74,6 @@ def callback_odom(msg: Odometry):
     global pose
     pose=msg.pose.pose
 
-def remove_files_in_dir(dir_path: str):
-    for f in os.listdir(dir_path):
-        file_path = os.path.join(dir_path, f)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        except Exception as e:
-            print("Failed to delete %s. Reason: %s" % (file_path, e)) 
-
 def main(args: argparse.Namespace):
     # load model parameters
     with open(MODEL_CONFIG_PATH, "r") as f:
@@ -125,6 +114,7 @@ def main(args: argparse.Namespace):
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
     odom_msg = rospy.Subscriber(ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
+    odom_distance_pub = rospy.Publisher("/odom_distance", Float32MultiArray, queue_size=1)
     closest_node_pub = rospy.Publisher("/closest_node", Image, queue_size=1)
     last_node_pub = rospy.Publisher("/last_node", Image, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
@@ -139,6 +129,7 @@ def main(args: argparse.Namespace):
             if i == 0:
                 closest_node = i
                 topomap.add_node(closest_node, image=obs_img, pose=pose)
+                path.append(closest_node)
                 last_node = i
                 i += 1
                 temporal_count = 0
@@ -154,6 +145,9 @@ def main(args: argparse.Namespace):
                     check_nodes.append(node)
                 closest_node = check_nodes[np.argmin(check_distances)]
                 closest_distance = check_distances[np.argmin(check_distances)]
+                odom_distance_msg=Float32MultiArray()
+                odom_distance_msg.data=[closest_distance,pose.position.x,pose.position.y,closest_node]
+                odom_distance_pub.publish(odom_distance_msg)
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f} nearby_nodes:{check_nodes}")
                 if  closest_distance < args.close_threshold:
                     if topomap.loop_back == False and closest_node in range(topomap.last_number_of_nodes):
@@ -241,7 +235,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--far_threshold",
-        default=18.,
+        default=15.,
         type=int,
         help="""temporal distance far away from the nodes in the topomap before 
         localizing to it (default: 18)""",
@@ -251,27 +245,25 @@ if __name__ == "__main__":
         "-t",
         default=5,
         type=float,
-        help=f"time between images sampled from the {IMAGE_TOPIC} topic (default: 3 seconds)",
+        help=f"time between images sampled from the {IMAGE_TOPIC} topic (default: 5 seconds)",
     )
     parser.add_argument(
         "--area",
         "-a",
-        default=10.,
+        default=5.,
         type=float,
-        help="""area range of nearby nodes checked in odom(default: 10)""",
+        help="""area range of nearby nodes checked in odom(default: 5)""",
     )
     parser.add_argument(
         "--restart",
         "-r",
-        default=False,
-        type=bool,
+        action='store_true',
         help="""whether remake the topomap or not (default: Flase)""",
     )
     parser.add_argument(
         "--save",
         "-s",
-        default=False,
-        type=bool,
+        action='store_true',
         help="""whether save the topomap or not (default: True)""",
     )
     parser.add_argument(
