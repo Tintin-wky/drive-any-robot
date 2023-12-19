@@ -3,7 +3,7 @@
 # Test environment
 - outdoor square
 # Test result:
-Use outdoor2.bag, generate topomaps in three ways, the odom is not accurate due to slipping of the tires.
+Use outdoor2.bag, generate topomaps in two ways, the odom is not accurate due to slipping of the tires.
 - test 1: generate the whole topomap in one time 
   - rosbag time :0-164s
   - path:
