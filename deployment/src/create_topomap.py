@@ -11,6 +11,7 @@ import numpy as np
 import os
 import argparse
 import yaml
+import random
 
 # UTILS
 from utils import to_numpy, transform_images, load_model,pil_to_msg
@@ -114,9 +115,8 @@ def main(args: argparse.Namespace):
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
     odom_msg = rospy.Subscriber(ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
-    odom_distance_pub = rospy.Publisher("/odom_distance", Float32MultiArray, queue_size=1)
-    closest_node_pub = rospy.Publisher("/closest_node", Image, queue_size=1)
-    last_node_pub = rospy.Publisher("/last_node", Image, queue_size=1)
+    closest_node_pub = rospy.Publisher("/topoplan/closest_node", Image, queue_size=1)
+    last_node_pub = rospy.Publisher("/topoplan/last_node", Image, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
     
     i = topomap.number_of_nodes()
@@ -126,17 +126,64 @@ def main(args: argparse.Namespace):
     
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
+            global obs_img
+            transf_obs_img = transform_images(context_queue, model_params["image_size"])   
             if i == 0:
                 closest_node = i
-                topomap.add_node(closest_node, image=obs_img, pose=pose)
                 path.append(closest_node)
+                topomap.add_node(closest_node, image=obs_img, pose=pose)
+                rospy.loginfo("start create a new topomap")
                 last_node = i
                 i += 1
                 temporal_count = 0
             else:
+                if last_node is None:
+                    check_distances = []
+                    for node in range(topomap.number_of_nodes()):
+                        check_img= topomap.nodes[node]['image']
+                        transf_check_img = transform_images(check_img, model_params["image_size"])
+                        dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                        check_distances.append(to_numpy(dist[0]))
+                    closest_node = np.argmin(check_distances)
+                    closest_distance = check_distances[closest_node]
+                    rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
+                    if closest_distance < args.close_threshold:
+                        last_node = closest_node
+                        topomap.loopback(closest_node,pose)
+                        rospy.loginfo("arrive at nodes on the former topomap")
+                    else:
+                        closest_node = i
+                        path.append(closest_node)
+                        topomap.add_node(closest_node, image=obs_img, pose=pose)
+                        rospy.loginfo(f"start create a new topomap at node {i}")
+                        last_node = closest_node
+                        i += 1
+                        temporal_count = 0
+
+                if topomap.loop_back is False:
+                    check_distances = []
+                    check_nodes = [] 
+                    for node in random.sample(range(topomap.last_number_of_nodes),5):
+                        check_img= topomap.nodes[node]['image']
+                        transf_check_img = transform_images(check_img, model_params["image_size"])
+                        dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                        check_distances.append(to_numpy(dist[0]))
+                        check_nodes.append(node)
+                    closest_node = check_nodes[np.argmin(check_distances)]
+                    closest_distance = check_distances[np.argmin(check_distances)]
+                    rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f} sampled_nodes:{check_nodes}")
+                    if closest_distance < args.close_threshold:
+                        topomap.nodes[closest_node]['count'] += 1
+                        path.append(closest_node)
+                        topomap.loopback(closest_node,pose)
+                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                        rospy.loginfo("arrive at nodes on the former topomap")
+                        last_node = closest_node
+                        temporal_count = 0
+                        
                 check_distances = []
-                check_nodes = []
-                transf_obs_img = transform_images(context_queue, model_params["image_size"])   
+                check_nodes = [] 
                 for node in topomap.neighbors(last_node,args.area):
                     check_img= topomap.nodes[node]['image']
                     transf_check_img = transform_images(check_img, model_params["image_size"])
@@ -145,47 +192,31 @@ def main(args: argparse.Namespace):
                     check_nodes.append(node)
                 closest_node = check_nodes[np.argmin(check_distances)]
                 closest_distance = check_distances[np.argmin(check_distances)]
-                odom_distance_msg=Float32MultiArray()
-                odom_distance_msg.data=[closest_distance,pose.position.x,pose.position.y,closest_node]
-                odom_distance_pub.publish(odom_distance_msg)
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f} nearby_nodes:{check_nodes}")
-                if  closest_distance < args.close_threshold:
-                    if topomap.loop_back == False and closest_node in range(topomap.last_number_of_nodes):
-                        topomap.loopback(node=closest_node,newpose=pose,num_nodes=topomap.last_number_of_nodes)
-                        rospy.loginfo("encounter the node on existed topomap")
-                    if last_node is None:
-                        last_node = closest_node
-                        topomap.nodes[closest_node]['count'] += 1
-                        path.append(closest_node)
-                    if last_node != closest_node:
-                        topomap.nodes[closest_node]['count'] += 1
-                        path.append(closest_node)
-                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
-                        topomap.update_node(closest_node,image=obs_img, pose=pose)
-                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
-                        last_node = closest_node
-                        temporal_count = 0
+                    
+                if  closest_distance < args.close_threshold and last_node != closest_node:
+                    topomap.nodes[closest_node]['count'] += 1
+                    path.append(closest_node)
+                    topomap.update_node(closest_node,image=obs_img, pose=pose)
+                    topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                    last_node = closest_node
+                    temporal_count = 0
                 elif closest_distance > args.far_threshold:
                     closest_node = i
                     path.append(closest_node)
                     topomap.add_node(closest_node, image=obs_img, pose=pose)
-                    if last_node is None:
-                        last_node = closest_node
-                    if last_node != closest_node:
-                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
-                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = i
                     i += 1
                     temporal_count = 0
-                elif temporal_count % (args.dt*RATE) == 0: 
+                elif temporal_count % (args.dt*RATE) == 0 and last_node != closest_node: 
                     closest_node = i
                     path.append(closest_node)
                     topomap.add_node(closest_node, image=obs_img, pose=pose)
-                    if last_node is None:
-                        last_node = closest_node
-                    if last_node != closest_node:
-                        rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
-                        topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
+                    rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = i
                     i += 1
                     temporal_count = 0
@@ -199,7 +230,7 @@ def main(args: argparse.Namespace):
             global last_message_time
             if rospy.get_time() - last_message_time > 1:
                 rospy.loginfo("No message received for {} seconds. Exiting...".format(1))
-                print(path)
+                print(f"path:{path}")
                 topomap.path.append(path)
                 if args.save:
                     topomap.save(args.name)

@@ -1,5 +1,5 @@
 # Test time
-12.17 daytime
+daytime
 # Test environment
 - outdoor square
 # Test result:

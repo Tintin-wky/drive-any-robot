@@ -1,5 +1,5 @@
 # Test time
-12.02 Daytime
+Daytime
 # Test environment
 - indoor corridor 
 - outdoor road

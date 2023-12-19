@@ -1,5 +1,5 @@
 # Test time
-12.14 daytime
+daytime
 # Test environment
 - indoor hall
 - outdoor square

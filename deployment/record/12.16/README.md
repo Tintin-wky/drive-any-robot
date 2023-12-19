@@ -1,5 +1,5 @@
 # Test time
-12.16 nighttime
+nighttime
 # Test environment
 - indoor hall
 # Test result:  

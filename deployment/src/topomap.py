@@ -11,6 +11,7 @@ from geometry_msgs.msg import Quaternion,Pose
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 TOPOMAPS="../topomaps/topomaps.pkl"
+TOPOMAP_FIGURE="../topomaps/topomap.png"
 
 def remove_files_in_dir(dir_path: str):
     for f in os.listdir(dir_path):
@@ -87,10 +88,10 @@ class Topomap(nx.DiGraph):
     def update_node(self,node,image,pose):
         None
 
-    def loopback(self,node:int,newpose:Pose,num_nodes:int):
+    def loopback(self,node:int,newpose:Pose):
         pose = self.nodes[node]['pose']
         offset = offset_calculate(pose1=pose,pose2=newpose)
-        for node in range(num_nodes):
+        for node in range(self.last_number_of_nodes):
             self.nodes[node]['pose'].position.x += offset['dx']
             self.nodes[node]['pose'].position.y += offset['dy']
             yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
@@ -105,15 +106,15 @@ class Topomap(nx.DiGraph):
 
     def neighbors(self, n, area):
         neighbors=set()
-        if n is None:
-            for node in range(self.number_of_nodes()):
-                neighbors.add(node)
-            return neighbors
         for node in super().neighbors(n):
             neighbors.add(node)
         x0=self.nodes[n]['pose'].position.x
         y0=self.nodes[n]['pose'].position.y
-        for node in range(self.number_of_nodes()):
+        if self.loop_back is True:
+            range_nodes = range(self.number_of_nodes())
+        else:
+            range_nodes = range(self.last_number_of_nodes,self.number_of_nodes())
+        for node in range_nodes:
             x=self.nodes[node]['pose'].position.x
             y=self.nodes[node]['pose'].position.y
             distance = np.linalg.norm(np.array([x0,y0]) - np.array([x,y]))
@@ -143,13 +144,9 @@ class Topomap(nx.DiGraph):
                 image = self.nodes[node]['image']
                 ax.imshow(image, extent=[x-0.8, x+0.8, y-0.6, y+0.6], aspect='auto')
             ax.annotate(node, (x, y-1), fontsize=12, ha="center", va="center",color="r")
-        nx.draw_networkx_edges(self, pos)
+        nx.draw_networkx_edges(self, pos,node_size=2000)
 
         if(show_distance):
-            labels = {}
-            edge_weights = [edge[2]['weight'] for edge in self.edges(data=True)]
-            for i, weight in enumerate(edge_weights):
-                labels[(f"Node_{i}", f"Node_{i+1}")] = f"{weight:.2f}"
             edge_labels = nx.get_edge_attributes(self, 'weight')
             edge_labels = {(k[0], k[1]): f"{v:.2f}" for k, v in edge_labels.items()}
             nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
@@ -158,4 +155,5 @@ class Topomap(nx.DiGraph):
         plt.xlim(xmin-margin,xmax+margin)
         plt.ylim(ymin-margin,ymax+margin)
         plt.axis('off')
+        plt.savefig(TOPOMAP_FIGURE)
         plt.show()

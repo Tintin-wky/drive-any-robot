@@ -1,5 +1,5 @@
 # Test time
-12.05 Nighttime
+Nighttime
 # Test environment
 - indoor hall 
 # Navigate strategy: 
