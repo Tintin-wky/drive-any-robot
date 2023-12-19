@@ -41,7 +41,7 @@ class Topomap(nx.DiGraph):
     def __init__(self):
         super().__init__()
         self.path = []
-        self.last_number_of_nodes = 0
+        self.last_number_of_nodes = -1
         self.loop_back = True
 
     def get_adjacency_matrix(self):
@@ -58,10 +58,10 @@ class Topomap(nx.DiGraph):
         return adjacency_matrix
     
     def reset(self):
-        for i in range(len(self.nodes())):
+        for i in self.nodes():
             self.nodes[i]['count'] = 0
         self.loop_back = False
-        self.last_number_of_nodes = self.number_of_nodes()
+        self.last_number_of_nodes = i
 
     def save(self,name):
         with open(TOPOMAPS, 'wb') as file:
@@ -91,7 +91,7 @@ class Topomap(nx.DiGraph):
     def loopback(self,node:int,newpose:Pose):
         pose = self.nodes[node]['pose']
         offset = offset_calculate(pose1=pose,pose2=newpose)
-        for node in range(self.last_number_of_nodes):
+        for node in [n for n in self.nodes() if  n < self.last_number_of_nodes]:
             self.nodes[node]['pose'].position.x += offset['dx']
             self.nodes[node]['pose'].position.y += offset['dy']
             yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
@@ -103,6 +103,26 @@ class Topomap(nx.DiGraph):
             self.nodes[node]['pose'].orientation.z = quaternion[2]
             self.nodes[node]['pose'].orientation.w = quaternion[3]
         self.loop_back = True
+    
+    def merge(self,node_reserved,node_replaced):
+        # 转移所有指向B的边到A
+        for u, v, data in list(self.in_edges(node_replaced, data=True)):
+            if u != node_reserved:  # 避免自环
+                self.add_edge(u, node_reserved, **data)
+        # 转移所有从B出发的边到A
+        for u, v, data in list(self.out_edges(node_replaced, data=True)):
+            if v != node_reserved:  # 避免自环
+                self.add_edge(node_reserved, v, **data)
+        # 删除节点B
+        self.remove_node(node_replaced)
+
+
+    def pruning(self,node,node_list,distance_list,close_threshold):
+        for i in range(len(node_list)):
+            if distance_list[i] < close_threshold and node_list[i] != node:
+                self.merge(node,node_list[i])
+                print(f"replace node {node_list[i]} with node {node}")
+
 
     def neighbors(self, n, area):
         neighbors=set()
@@ -111,9 +131,9 @@ class Topomap(nx.DiGraph):
         x0=self.nodes[n]['pose'].position.x
         y0=self.nodes[n]['pose'].position.y
         if self.loop_back is True:
-            range_nodes = range(self.number_of_nodes())
+            range_nodes = self.nodes()
         else:
-            range_nodes = range(self.last_number_of_nodes,self.number_of_nodes())
+            range_nodes = [n for n in self.nodes() if  n >= self.last_number_of_nodes] 
         for node in range_nodes:
             x=self.nodes[node]['pose'].position.x
             y=self.nodes[node]['pose'].position.y
@@ -127,13 +147,12 @@ class Topomap(nx.DiGraph):
         
         x0=self.nodes[0]['pose'].position.x
         y0=self.nodes[0]['pose'].position.y
-        xmin,xmax,ymin,ymax,i=0,0,0,0,0
+        xmin,xmax,ymin,ymax=0,0,0,0
         pos = {}
         for node,data in self.nodes(data=True):
             x=data['pose'].position.x - x0
             y=data['pose'].position.y - y0
-            pos.update({i:np.array([x,y])})
-            i += 1
+            pos.update({node:np.array([x,y])})
             xmin=x if x<xmin else xmin
             xmax=x if x>xmax else xmax
             ymin=y if y<ymin else ymin

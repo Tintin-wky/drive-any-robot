@@ -119,7 +119,7 @@ def main(args: argparse.Namespace):
     last_node_pub = rospy.Publisher("/topoplan/last_node", Image, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
     
-    i = topomap.number_of_nodes()
+    i = topomap.last_number_of_nodes + 1
     temporal_count = 0
     path = []
     last_node = None
@@ -139,7 +139,7 @@ def main(args: argparse.Namespace):
             else:
                 if last_node is None:
                     check_distances = []
-                    for node in range(topomap.number_of_nodes()):
+                    for node in topomap.nodes():
                         check_img= topomap.nodes[node]['image']
                         transf_check_img = transform_images(check_img, model_params["image_size"])
                         dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
@@ -165,7 +165,7 @@ def main(args: argparse.Namespace):
                 if topomap.loop_back is False:
                     check_distances = []
                     check_nodes = [] 
-                    for node in random.sample(range(topomap.last_number_of_nodes),5):
+                    for node in random.sample([n for n in topomap.nodes() if  n < topomap.last_number_of_nodes],5):
                         check_img= topomap.nodes[node]['image']
                         transf_check_img = transform_images(check_img, model_params["image_size"])
                         dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
@@ -202,6 +202,7 @@ def main(args: argparse.Namespace):
                     topomap.update_node(closest_node,image=obs_img, pose=pose)
                     topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                    topomap.pruning(closest_node,check_nodes,check_distances,args.close_threshold)
                     last_node = closest_node
                     temporal_count = 0
                 elif closest_distance > args.far_threshold and temporal_count != 0:

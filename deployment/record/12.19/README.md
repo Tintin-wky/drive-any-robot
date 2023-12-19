@@ -9,6 +9,9 @@ daytime
   - time and distance based
 - Test 2: distance distribution before and after create topomap
 - Test 3: explore on exsited topomap 
+- Test 4: map pruning
 # Conclusion
 - Test 1: time and distance based is the best among three
 - Test 2: show the continuous of nodes choosen in topomap
+- Test 3: the new explore succesfully join the origin topomap
+- Test 4: the topomap is sparsed after pruning

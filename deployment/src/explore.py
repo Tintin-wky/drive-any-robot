@@ -233,6 +233,7 @@ def explore(args: argparse.Namespace):
                     topomap.update_node(closest_node,image=obs_img, pose=pose)
                     topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
+                    topomap.pruning(closest_node,check_nodes,check_distances,args.close_threshold)
                     last_node = closest_node
                     temporal_count = 0
                 elif closest_distance > args.far_threshold and temporal_count != 0:
