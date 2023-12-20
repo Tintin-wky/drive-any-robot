@@ -17,7 +17,7 @@ tmux send-keys "python create_trajectory.py $@" Enter
 # Change the directory to ../navigate/bags and run the rosbag record command in the second pane
 tmux select-pane -t 1
 tmux send-keys "cd ../topomaps/bags/explore" Enter
-tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis /path -o $log"  # change topic if necessary
+tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis -o $log"  # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name

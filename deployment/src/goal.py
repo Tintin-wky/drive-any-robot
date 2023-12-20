@@ -8,16 +8,9 @@ import argparse
 
 TOPOMAP_IMAGES_DIR="../topomaps/images"
 
-reached_goal = False
-def callback_reached_goal(reached_goal_msg: Bool):
-	"""Callback function for the reached goal subscriber"""
-	global reached_goal
-	reached_goal = reached_goal_msg.data
-     
 def main(args: argparse.Namespace):
     rospy.init_node('goal_publisher', anonymous=True)
     pub = rospy.Publisher('/goal/image', Image, queue_size=1)
-    reached_goal_sub = rospy.Subscriber("/topoplan/reached_goal", Bool, callback_reached_goal, queue_size=1)
     rate = rospy.Rate(1/args.duration) if args.ID == -1 else rospy.Rate(1)
 
     # load topomap
