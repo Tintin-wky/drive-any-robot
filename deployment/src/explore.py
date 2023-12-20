@@ -196,7 +196,7 @@ def explore(args: argparse.Namespace):
                 if topomap.loop_back is False:
                     check_distances = []
                     check_nodes = [] 
-                    for node in random.sample(range(topomap.last_number_of_nodes),5):
+                    for node in random.sample(range(topomap.last_node_ID),5):
                         check_img= topomap.nodes[node]['image']
                         transf_check_img = transform_images(check_img, model_params["image_size"])
                         dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 

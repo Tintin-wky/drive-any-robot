@@ -49,7 +49,7 @@ model_params = {
 
 # GLOBALS
 context_queue = []
-goal_images = []
+goal_image = []
 odom = Pose()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -65,8 +65,8 @@ def callback_obs(msg):
         context_queue.append(obs_img)
 
 def callback_goal(msg):
-    global goal_images
-    goal_images.append(msg_to_pil(msg))
+    global goal_image
+    goal_image=list(msg_to_pil(msg))
     
 def callback_odom(msg: Odometry):
     global odom
@@ -120,9 +120,9 @@ def main(args: argparse.Namespace):
     count = 0
     # navigation loop
     while not rospy.is_shutdown():
-        if len(context_queue) > model_params["context"] and len(goal_images) != 0:
+        if len(context_queue) > model_params["context"] and goal_image:
             transf_obs_img = transform_images(context_queue, model_params["image_size"])
-            transf_sg_img = transform_images(goal_images[-1], model_params["image_size"])
+            transf_sg_img = transform_images(goal_image, model_params["image_size"])
             dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
             distance=to_numpy(dist[0])
             waypoint=to_numpy(waypoints[0][args.waypoint])

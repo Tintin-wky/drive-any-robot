@@ -4,10 +4,12 @@ from PIL import Image
 import os
 import pickle
 import shutil
+import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Quaternion,Pose
+from models import gnm
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 TOPOMAPS="../topomaps/topomaps.pkl"
@@ -41,12 +43,12 @@ class Topomap(nx.DiGraph):
     def __init__(self):
         super().__init__()
         self.path = []
-        self.last_number_of_nodes = -1
+        self.last_node_ID = -1
         self.loop_back = True
 
     def get_adjacency_matrix(self):
-        num_nodes = len(self.nodes())
-        adjacency_matrix = np.full((num_nodes, num_nodes), np.inf, dtype=float)
+        last_node = list(self.nodes())[-1] + 1
+        adjacency_matrix = np.full((last_node, last_node), np.inf, dtype=float)
         np.fill_diagonal(adjacency_matrix, 0)
 
         for node,data in self.nodes(data=True):
@@ -61,9 +63,9 @@ class Topomap(nx.DiGraph):
         for i in self.nodes():
             self.nodes[i]['count'] = 0
         self.loop_back = False
-        self.last_number_of_nodes = i
 
     def save(self,name):
+        self.last_node_ID = list(self.nodes())[-1]
         with open(TOPOMAPS, 'wb') as file:
             pickle.dump(dict([(name,self)]), file)
         topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, name)
@@ -75,7 +77,6 @@ class Topomap(nx.DiGraph):
         for node in tqdm(self.nodes(),total=self.number_of_nodes(), desc="Saving"):
             image = self.nodes[node]['image']
             image.save(os.path.join(topomap_name_dir, f"{node}.png"))
-
 
     def add_node(self, node_for_adding, **attr):
         count = 1
@@ -91,7 +92,7 @@ class Topomap(nx.DiGraph):
     def loopback(self,node:int,newpose:Pose):
         pose = self.nodes[node]['pose']
         offset = offset_calculate(pose1=pose,pose2=newpose)
-        for node in [n for n in self.nodes() if  n < self.last_number_of_nodes]:
+        for node in [n for n in self.nodes() if  n < self.last_node_ID]:
             self.nodes[node]['pose'].position.x += offset['dx']
             self.nodes[node]['pose'].position.y += offset['dy']
             yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
@@ -106,13 +107,13 @@ class Topomap(nx.DiGraph):
     
     def merge(self,node_reserved,node_replaced):
         # 转移所有指向B的边到A
-        for u, v in list(self.in_edges(node_replaced)):
+        for u, v, data in list(self.in_edges(node_replaced, data=True)):
             if u != node_reserved:  # 避免自环
-                self.add_edge(u, node_reserved)
+                self.add_edge(u, node_reserved, weight=data['weight'])
         # 转移所有从B出发的边到A
-        for u, v in list(self.out_edges(node_replaced)):
+        for u, v, data in list(self.out_edges(node_replaced, data=True)):
             if v != node_reserved:  # 避免自环
-                self.add_edge(node_reserved, v)
+                self.add_edge(node_reserved, v, weight=data['weight'])
         # 删除节点B
         self.remove_node(node_replaced)
 
@@ -123,6 +124,11 @@ class Topomap(nx.DiGraph):
                 self.merge(node,node_list[i])
                 print(f"replace node {node_list[i]} with node {node}")
 
+    def shortest_path(self,node1,node2):
+        try:
+            return nx.shortest_path(self, source=node1, target=node2, weight='weight')
+        except nx.NetworkXNoPath:
+            return [node1]
 
     def neighbors(self, n, area):
         neighbors=set()
@@ -130,11 +136,9 @@ class Topomap(nx.DiGraph):
             neighbors.add(node)
         x0=self.nodes[n]['pose'].position.x
         y0=self.nodes[n]['pose'].position.y
-        if self.loop_back is True:
-            range_nodes = self.nodes()
-        else:
-            range_nodes = [n for n in self.nodes() if  n > self.last_number_of_nodes] 
-        for node in range_nodes:
+        for node in self.nodes():
+            if self.loop_back is False and node < self.last_node_ID:
+                continue
             x=self.nodes[node]['pose'].position.x
             y=self.nodes[node]['pose'].position.y
             distance = np.linalg.norm(np.array([x0,y0]) - np.array([x,y]))
@@ -176,3 +180,26 @@ class Topomap(nx.DiGraph):
         plt.axis('off')
         plt.savefig(TOPOMAP_FIGURE)
         plt.show()
+
+def main(args: argparse.Namespace):
+    with open(TOPOMAPS, 'rb') as file:
+        topomap = pickle.load(file)[args.name]
+    # print(topomap.get_adjacency_matrix())
+    # print(topomap.path)
+    print(topomap.nodes()[0]['image'])
+    print(topomap.shortest_path(0,6))
+    # print(topomap.shortest_path(8,2))
+    # print(topomap.shortest_path(30,1))
+    # topomap.visualize()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")
+    parser.add_argument(
+        "--name",
+        "-n",
+        default="topomap",
+        type=str,
+        help="name of your topomap (default: topomap)",
+    )
+    args = parser.parse_args()
+    main(args)

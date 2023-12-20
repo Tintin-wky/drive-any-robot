@@ -119,14 +119,13 @@ def main(args: argparse.Namespace):
     last_node_pub = rospy.Publisher("/topoplan/last_node", Image, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
     
-    i = topomap.last_number_of_nodes + 1
+    i = topomap.last_node_ID + 1
     temporal_count = 0
     path = []
     last_node = None
     
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
-            global obs_img
             transf_obs_img = transform_images(context_queue, model_params["image_size"])   
             if i == 0:
                 closest_node = i
@@ -139,13 +138,15 @@ def main(args: argparse.Namespace):
             else:
                 if last_node is None:
                     check_distances = []
+                    check_nodes = [] 
                     for node in topomap.nodes():
                         check_img= topomap.nodes[node]['image']
                         transf_check_img = transform_images(check_img, model_params["image_size"])
                         dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
                         check_distances.append(to_numpy(dist[0]))
-                    closest_node = np.argmin(check_distances)
-                    closest_distance = check_distances[closest_node]
+                        check_nodes.append(node)
+                    closest_node = check_nodes[np.argmin(check_distances)]
+                    closest_distance = check_distances[np.argmin(check_distances)]
                     rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
                     if closest_distance < args.close_threshold:
                         last_node = closest_node
@@ -165,7 +166,7 @@ def main(args: argparse.Namespace):
                 if topomap.loop_back is False:
                     check_distances = []
                     check_nodes = [] 
-                    for node in random.sample([n for n in topomap.nodes() if  n < topomap.last_number_of_nodes],5):
+                    for node in random.sample([n for n in topomap.nodes() if  n < topomap.last_node_ID],5):
                         check_img= topomap.nodes[node]['image']
                         transf_check_img = transform_images(check_img, model_params["image_size"])
                         dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 

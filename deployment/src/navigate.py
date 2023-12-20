@@ -9,12 +9,13 @@ import torch
 from PIL import Image as PILImage
 import numpy as np
 import os
+import pickle
 import argparse
 import yaml
 import io
 
 # UTILS
-from utils import msg_to_pil, to_numpy, transform_images, load_model
+from utils import to_numpy, transform_images, load_model
 
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
@@ -27,10 +28,8 @@ with open(ROBOT_CONFIG_PATH, "r") as f:
 MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
-# RATE = 20
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-GOAL_IMAGE_TOPIC = "/goal/image"
-ODOM_TOPIC = "/odom_chassis"
+TOPOMAPS="../topomaps/topomaps.pkl"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -49,7 +48,6 @@ model_params = {
 
 # GLOBALS
 context_queue = []
-goal_images = []
 odom = Pose()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,17 +61,26 @@ def callback_obs(msg):
     else:
         context_queue.pop(0)
         context_queue.append(obs_img)
-
-def callback_goal(msg):
-    global goal_images
-    goal_images.append(msg_to_pil(msg))
     
 def callback_odom(msg: Odometry):
-    global odom
-    odom=msg.pose.pose
+    global pose
+    pose=msg.pose.pose
+
+def closest_node(model,topomap,image_queue):
+    transf_image = transform_images(image_queue, model_params["image_size"])
+    check_distances = []
+    check_nodes = [] 
+    for node in topomap.nodes():
+        check_img= topomap.nodes[node]['image']
+        transf_check_img = transform_images(check_img, model_params["image_size"])
+        dist, _ = model(transf_image.to(device), transf_check_img.to(device)) 
+        check_distances.append(to_numpy(dist[0]))
+        check_nodes.append(node)
+    closest_node = check_nodes[np.argmin(check_distances)]
+    closest_distance = check_distances[np.argmin(check_distances)]
+    return closest_node, closest_distance
 
 def main(args: argparse.Namespace):
-
     # load model parameters
     with open(MODEL_CONFIG_PATH, "r") as f:
         model_config = yaml.safe_load(f)
@@ -100,46 +107,64 @@ def main(args: argparse.Namespace):
     )
     model.eval()
 
+    # load topomaps
+    with open(TOPOMAPS, 'rb') as file:
+        topomap = pickle.load(file)[args.name]
+        topomap.reset()
+
+    # load destination
+    destination = args.destination
+    goal_img=PILImage.open(destination)
+
     # ROS
     rospy.init_node("TOPOPLAN", anonymous=False)
     rate = rospy.Rate(RATE)
-    image_curr_msg = rospy.Subscriber(
-        IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
-    image_goal_msg = rospy.Subscriber(
-        GOAL_IMAGE_TOPIC, Image, callback_goal, queue_size=1)
-    odom_msg = rospy.Subscriber(
-        ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
-    odom_distance_pub = rospy.Publisher(
-        "/odom_distance", Float32MultiArray, queue_size=1)
-    waypoint_pub = rospy.Publisher(
-        "/waypoint", Float32MultiArray, queue_size=1)
+    image_curr_msg = rospy.Subscriber(IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
+    waypoint_pub = rospy.Publisher("/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
 
+    i = 0
+    path = []
+    complete_path = False
     reached_goal = False
-    count = 0
     # navigation loop
     while not rospy.is_shutdown():
-        if len(context_queue) > model_params["context"] and len(goal_images) != 0:
+        if len(context_queue) > model_params["context"]:
+            if not path:
+                start_node, _ = closest_node(model, topomap, context_queue)
+                goal_queue = []
+                while len(goal_queue) < model_params["context"] + 1:
+                    goal_queue.append(goal_img)
+                goal_node, _ = closest_node(model, topomap, goal_queue)
+                path = topomap.shortest_path(start_node, goal_node)
+                rospy.loginfo(f"path: {path}")
+                rospy.loginfo(f"start at node {path[0]}")
+
+            sg_img = goal_img if complete_path else [topomap.nodes()[path[i]]['image']] 
             transf_obs_img = transform_images(context_queue, model_params["image_size"])
-            transf_sg_img = transform_images(goal_images[-1], model_params["image_size"])
+            transf_sg_img = transform_images(sg_img, model_params["image_size"])
             dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
             distance=to_numpy(dist[0])
             waypoint=to_numpy(waypoints[0][args.waypoint])
-            rospy.loginfo(f"Estimate distance:{distance.item():.2f} x:{odom.position.x:.2f} y {odom.position.y:.2f}")
-
-            odom_distance_msg=Float32MultiArray()
-            odom_distance_msg.data=[distance,odom.position.x,odom.position.y]
-            odom_distance_pub.publish(odom_distance_msg)
-
-            reached_goal = bool(distance < args.close_threshold)
-            goal_pub.publish(reached_goal)
-            # return after a duration after reaching goal
-            if reached_goal:
-                count += 1
+            if complete_path:
+                rospy.loginfo(f"Target: goal Estimate distance:{distance.item():.2f}")
             else:
-                count = 0
-            if count > RATE * 5:
+                rospy.loginfo(f"Target node: {path[i]} Estimate distance:{distance.item():.2f}")
+
+            if distance < args.close_threshold:
+                if complete_path:
+                    reached_goal = True
+                    rospy.loginfo(f"reach goal!")
+                elif path[i] == path[-1]: # goal_node
+                    complete_path = True
+                    rospy.loginfo(f"end at node {path[-1]}")
+                    rospy.loginfo(f"complete the path")
+                else:
+                    rospy.loginfo(f"arrive at node {path[i]} ({i}/{len(path)})")
+                    i = i + 1
+            goal_pub.publish(reached_goal)
+            if reached_goal:
                 return
 
             waypoint_msg = Float32MultiArray()
@@ -154,6 +179,20 @@ def main(args: argparse.Namespace):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Code to run GNMs on the classbot")
+    parser.add_argument(
+        "--name",
+        "-n",
+        default="topomap",
+        type=str,
+        help="name of your topomap (default: topomap)",
+    )
+    parser.add_argument(
+        "--destination",
+        "-d",
+        default="../topomaps/destination/8.png",
+        type=str,
+        help="path to destination image",
+    )
     parser.add_argument(
         "--model",
         "-m",
