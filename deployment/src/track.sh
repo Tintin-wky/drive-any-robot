@@ -14,17 +14,17 @@ tmux splitw -v -p 50 # split it into two halves
 tmux selectp -t 0    # go back to the first pane
 
 # Run the navigate.py script with command line args in the first pane
-tmux select-pane -t 1
+tmux select-pane -t 0
 tmux send-keys "conda activate gnm_deployment" Enter
 tmux send-keys "python track.py $@" Enter
 
 # Run the pd_controller.py script in the sencond pane
-tmux select-pane -t 2
+tmux select-pane -t 1
 tmux send-keys "conda activate gnm_deployment" Enter
 tmux send-keys "python pd_controller.py" Enter
 
 # Change the directory to ../navigate/bags and run the rosbag record command in the third pane
-tmux select-pane -t 3
+tmux select-pane -t 2
 tmux send-keys "cd ../topomaps/bags/navigate" Enter
 tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /odom_distance /scout_status /cmd_vel /odom_chassis /goal/image -o $log" Enter # change topic if necessary
 

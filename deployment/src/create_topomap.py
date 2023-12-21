@@ -23,7 +23,6 @@ from topomap import Topomap
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
 
-TOPOMAP_IMAGES_DIR = "../topomaps/images"
 MODEL_WEIGHTS_PATH = "../model_weights"
 ROBOT_CONFIG_PATH ="../config/robot.yaml"
 MODEL_CONFIG_PATH = "../config/models.yaml"
@@ -35,7 +34,6 @@ RATE = robot_config["frame_rate"]
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 ODOM_TOPIC = "/odom_chassis"
 DESTINATION_PATH = "../topomaps/destination"
-TOPOMAP_IMAGES_DIR = "../topomaps/images"
 TOPOMAPS="../topomaps/topomaps.pkl"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)

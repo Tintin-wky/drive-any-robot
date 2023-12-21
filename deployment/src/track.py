@@ -66,7 +66,7 @@ def callback_obs(msg):
 
 def callback_goal(msg):
     global goal_image
-    goal_image=list(msg_to_pil(msg))
+    goal_image=[msg_to_pil(msg)]
     
 def callback_odom(msg: Odometry):
     global odom
@@ -139,7 +139,7 @@ def main(args: argparse.Namespace):
                 count += 1
             else:
                 count = 0
-            if count > RATE * 5:
+            if count > RATE * 10:
                 return
 
             waypoint_msg = Float32MultiArray()

@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--duration",
         "-dt",
-        default=5.,
+        default=3.,
         type=float,
         help="duration between goals",
     )

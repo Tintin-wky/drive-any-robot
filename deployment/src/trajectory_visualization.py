@@ -2,23 +2,15 @@ import rospy
 import rosbag
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import pickle
 
+TOPOMAPS="../topomaps/topomaps.pkl"
+NAME='topomap'
 ODOM_TOPIC = "/odom_chassis"
-BAG_PATH_LIST = ["../topomaps/bags/raw/outdoor2_2023-12-07-14-33-37.bag"]
-# indoor
-# BAG_PATH_LIST = ["../topomaps/bags/raw/test1_2023-12-14-17-06-24.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702544973_2023-12-14-17-09-34.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702545079_2023-12-14-17-11-20.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702545144_2023-12-14-17-12-25.bag", \
-#            ] 
-# outdoor
-# BAG_PATH_LIST = ["../topomaps/bags/raw/test2_2023-12-14-17-31-54.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702546523_2023-12-14-17-35-24.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702546737_2023-12-14-17-38-58.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702546849_2023-12-14-17-40-50.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702547003_2023-12-14-17-43-24.bag", \
-#                  "../topomaps/bags/navigate/gnm_classbot_1702547137_2023-12-14-17-45-38.bag", \
-#            ] 
+BAG_PATH_LIST = ["../topomaps/bags/raw/test_2023-12-21-20-47-26.bag",
+                 "../topomaps/bags/navigate/gnm_classbot_1703163776_2023-12-21-21-02-56.bag",
+                 "../topomaps/bags/navigate/gnm_classbot_1703163958_2023-12-21-21-05-58.bag",
+                 "../topomaps/bags/navigate/gnm_classbot_1703164074_2023-12-21-21-07-54.bag"]
 
 def main():
     rospy.init_node("trajectory_visualization", anonymous=False)
@@ -34,6 +26,15 @@ def main():
             y.append(msg.pose.pose.position.y)
         plt.plot(x, y, label='Trajectory ' + str(i))
         i += 1
+    
+    with open(TOPOMAPS, 'rb') as file:
+        topomap = pickle.load(file)[NAME]
+    x_nodes=[]
+    y_nodes=[]
+    for i in topomap.nodes():
+        x_nodes.append(topomap.nodes[i]['pose'].position.x)
+        y_nodes.append(topomap.nodes[i]['pose'].position.y)
+    plt.scatter(x_nodes,y_nodes,c='red')
     
     # 添加图例
     plt.legend()
