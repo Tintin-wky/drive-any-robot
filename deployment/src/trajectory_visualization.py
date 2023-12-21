@@ -7,8 +7,7 @@ import pickle
 TOPOMAPS="../topomaps/topomaps.pkl"
 NAME='topomap'
 ODOM_TOPIC = "/odom_chassis"
-BAG_PATH_LIST = ["../topomaps/bags/raw/test_2023-12-21-20-47-26.bag",
-                 "../topomaps/bags/navigate/gnm_classbot_1703163776_2023-12-21-21-02-56.bag",
+BAG_PATH_LIST = ["../topomaps/bags/navigate/gnm_classbot_1703163776_2023-12-21-21-02-56.bag",
                  "../topomaps/bags/navigate/gnm_classbot_1703163958_2023-12-21-21-05-58.bag",
                  "../topomaps/bags/navigate/gnm_classbot_1703164074_2023-12-21-21-07-54.bag"]
 
