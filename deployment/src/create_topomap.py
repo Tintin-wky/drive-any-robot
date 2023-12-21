@@ -215,7 +215,7 @@ def main(args: argparse.Namespace):
                     last_node = i
                     i += 1
                     temporal_count = 0
-                elif temporal_count % (args.dt*RATE) == 0 and last_node != closest_node: 
+                elif temporal_count >= (args.dt*RATE) and last_node != closest_node: 
                     closest_node = i
                     path.append(closest_node)
                     topomap.add_node(closest_node, image=obs_img, pose=pose)
@@ -232,8 +232,17 @@ def main(args: argparse.Namespace):
             last_node_pub.publish(pil_to_msg(last_node_image))
             
             global last_message_time
-            if rospy.get_time() - last_message_time > 1:
-                rospy.loginfo("No message received for {} seconds. Exiting...".format(1))
+            if rospy.get_time() - last_message_time > args.dt:
+                rospy.loginfo("No message received for {} seconds. Exiting...".format(args.dt))
+                print(f"path:{path}")
+                topomap.path.append(path)
+                if args.save:
+                    topomap.save(args.name)
+                topomap.visualize()
+                return
+            
+            if temporal_count > RATE * args.dt * 2:
+                rospy.loginfo("Having stopped for {} seconds. Exiting...".format(args.dt*2))
                 print(f"path:{path}")
                 topomap.path.append(path)
                 if args.save:

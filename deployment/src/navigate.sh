@@ -26,7 +26,7 @@ tmux send-keys "conda activate gnm_deployment" Enter
 tmux send-keys "python pd_controller.py" Enter
 
 # Change the directory to ../navigate/bags and run the rosbag record command in the third pane
-tmux select-pane -t 3
+tmux select-pane -t 2
 tmux send-keys "cd ../topomaps/bags/navigate" Enter
 tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis -o $log" Enter # change topic if necessary
 

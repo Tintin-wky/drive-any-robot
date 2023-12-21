@@ -92,7 +92,7 @@ class Topomap(nx.DiGraph):
     def loopback(self,node:int,newpose:Pose):
         pose = self.nodes[node]['pose']
         offset = offset_calculate(pose1=pose,pose2=newpose)
-        for node in [n for n in self.nodes() if  n < self.last_node_ID]:
+        for node in [n for n in self.nodes() if  n <= self.last_node_ID]:
             self.nodes[node]['pose'].position.x += offset['dx']
             self.nodes[node]['pose'].position.y += offset['dy']
             yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
@@ -149,8 +149,9 @@ class Topomap(nx.DiGraph):
     def visualize(self,show_image=True,show_distance=True):
         fig, ax = plt.subplots()
         
-        x0=self.nodes[0]['pose'].position.x
-        y0=self.nodes[0]['pose'].position.y
+        nodes=list(self.nodes())
+        x0=self.nodes[nodes[0]]['pose'].position.x
+        y0=self.nodes[nodes[0]]['pose'].position.y
         xmin,xmax,ymin,ymax=0,0,0,0
         pos = {}
         for node,data in self.nodes(data=True):
@@ -186,11 +187,11 @@ def main(args: argparse.Namespace):
         topomap = pickle.load(file)[args.name]
     # print(topomap.get_adjacency_matrix())
     # print(topomap.path)
-    print(topomap.nodes()[0]['image'])
-    print(topomap.shortest_path(0,6))
+    # print(topomap.nodes()[0]['image'])
+    print(topomap.shortest_path(3,12))
     # print(topomap.shortest_path(8,2))
     # print(topomap.shortest_path(30,1))
-    # topomap.visualize()
+    topomap.visualize()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")
