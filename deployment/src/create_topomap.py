@@ -33,7 +33,6 @@ MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 ODOM_TOPIC = "/odom_chassis"
-DESTINATION_PATH = "../topomaps/destination"
 TOPOMAPS="../topomaps/topomaps.pkl"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)

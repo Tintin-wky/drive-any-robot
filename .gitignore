@@ -7,14 +7,15 @@ train/gnm_train/data/data_splits/*
 .vscode/*
 */.vscode/*
 *.bag
+*.jpg
 *.png
 *.avi
 *.mkv
+*.pkl
 recon_release/
 train/recon/
 train/gnm_train/data/data_splits
 train/wandb/
-*.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

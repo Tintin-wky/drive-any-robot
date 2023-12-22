@@ -34,7 +34,7 @@ MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 ODOM_TOPIC = "/odom_chassis"
-DESTINATION_PATH = "../topomaps/destination"
+DESTINATION_DIR = "../destination"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
 TOPOMAPS="../topomaps/topomaps.pkl"
 
@@ -88,8 +88,7 @@ def remove_files_in_dir(dir_path: str):
 
 def explore(args: argparse.Namespace):
     # load destination
-    destination = args.destination
-    goal_img=PILImage.open(destination)
+    goal_img=PILImage.open(os.path.join(DESTINATION_DIR, f"{args.destination}.png"))
     transf_goal_img = transform_images(goal_img, model_params["image_size"])
 
     # load model parameters
@@ -299,7 +298,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--destination",
         "-d",
-        default="../topomaps/destination/8.png",
+        default="8",
         type=str,
         help="path to destination image",
     )

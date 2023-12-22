@@ -30,6 +30,7 @@ MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 TOPOMAPS="../topomaps/topomaps.pkl"
+DESTINATION_DIR="../destination"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -113,8 +114,7 @@ def main(args: argparse.Namespace):
         topomap.reset()
 
     # load destination
-    destination = args.destination
-    goal_img=PILImage.open(destination)
+    goal_img=PILImage.open(os.path.join(DESTINATION_DIR, f"{args.destination}.png"))
 
     # ROS
     rospy.init_node("TOPOPLAN", anonymous=False)
@@ -189,9 +189,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--destination",
         "-d",
-        default="../topomaps/destination/8.png",
+        default="8",
         type=str,
-        help="path to destination image",
+        help="name of destination",
     )
     parser.add_argument(
         "--model",
