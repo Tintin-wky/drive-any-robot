@@ -80,7 +80,7 @@ def main():
 			# return
 		else:
 			vel_out.publish(vel_msg)
-			rospy.loginfo(f"publishing new vel: v:{vel_msg.linear.x} w:{vel_msg.angular.z}")
+			# rospy.loginfo(f"publishing new vel: v:{vel_msg.linear.x} w:{vel_msg.angular.z}")
 		rate.sleep()
 	
 

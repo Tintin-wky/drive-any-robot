@@ -141,16 +141,26 @@ def main(args: argparse.Namespace):
                 rospy.loginfo(f"path: {path}")
                 rospy.loginfo(f"start at node {path[0]}")
 
-            sg_img = goal_img if complete_path else [topomap.nodes()[path[i]]['image']] 
-            transf_obs_img = transform_images(context_queue, model_params["image_size"])
-            transf_sg_img = transform_images(sg_img, model_params["image_size"])
-            dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
-            distance=to_numpy(dist[0])
-            waypoint=to_numpy(waypoints[0][args.waypoint])
             if complete_path:
+                transf_obs_img = transform_images(context_queue, model_params["image_size"])
+                transf_sg_img = transform_images(goal_img, model_params["image_size"])
+                dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
+                distance=to_numpy(dist[0])
+                waypoint=to_numpy(waypoints[0][args.waypoint])
                 rospy.loginfo(f"Target: goal Estimate distance:{distance.item():.2f}")
             else:
-                rospy.loginfo(f"Target node: {path[i]} Estimate distance:{distance.item():.2f}")
+                check_distances = []
+                check_nodes = [] 
+                for node in topomap.neighbors(path[i],args.area):
+                    check_img= topomap.nodes[node]['image']
+                    transf_check_img = transform_images(check_img, model_params["image_size"])
+                    dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                    check_distances.append(to_numpy(dist[0]))
+                    check_nodes.append(node)
+                closest_node = check_nodes[np.argmin(check_distances)]
+                closest_distance = check_distances[np.argmin(check_distances)]
+                rospy.loginfo(f"Target node: {path[i]} nearby_nodes:{check_nodes}")
+                rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
 
             if distance < args.close_threshold:
                 if complete_path:
