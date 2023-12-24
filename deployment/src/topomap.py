@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image
 import os
 import pickle
+import math
 import shutil
 import argparse
 import matplotlib.pyplot as plt
@@ -39,6 +40,29 @@ def offset_calculate(pose1:Pose,pose2:Pose):
     dyaw = (dyaw + np.pi) % (2 * np.pi) - np.pi 
     return {'dx':dx, 'dy':dy, 'dyaw':dyaw}
 
+def rotate(point, angle):
+    rotation_matrix = np.array([
+        [np.cos(angle), -np.sin(angle)],
+        [np.sin(angle), np.cos(angle)]
+    ])
+    return rotation_matrix.dot(point)
+
+def get_transform(pose:Pose,newpose:Pose):
+    original_point = np.array([pose.position.x,pose.position.y])
+    new_point = np.array([newpose.position.x,newpose.position.y])
+    original_yaw = quaternion_to_euler(pose.orientation)[2]
+    new_yaw = quaternion_to_euler(newpose.orientation)[2]
+    angle_diff = new_yaw - original_yaw
+    rotated_point = rotate(original_point, angle_diff)
+    translation = new_point - rotated_point
+    return angle_diff, translation
+
+def transform(pose:Pose,angle_diff,translation):
+    original_point = np.array([pose.position.x,pose.position.y])
+    rotated_point = rotate(original_point, angle_diff)
+    transformed_point = rotated_point + translation
+    return transformed_point
+
 class Topomap(nx.DiGraph):
     def __init__(self):
         super().__init__()
@@ -64,10 +88,7 @@ class Topomap(nx.DiGraph):
             self.nodes[i]['count'] = 0
         self.loop_back = False
 
-    def save(self,name):
-        self.last_node_ID = list(self.nodes())[-1]
-        with open(TOPOMAPS, 'wb') as file:
-            pickle.dump(dict([(name,self)]), file)
+    def save_node_images(self,name):
         topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, name)
         if not os.path.isdir(topomap_name_dir):
             os.makedirs(topomap_name_dir)
@@ -77,6 +98,17 @@ class Topomap(nx.DiGraph):
         for node in tqdm(self.nodes(),total=self.number_of_nodes(), desc="Saving"):
             image = self.nodes[node]['image']
             image.save(os.path.join(topomap_name_dir, f"{node}.png"))
+
+    def save(self,name):
+        self.last_node_ID = list(self.nodes())[-1]
+        with open(TOPOMAPS, 'rb') as file:
+            topomaps = pickle.load(file)
+        topomaps[name] = self
+        with open(TOPOMAPS, 'wb') as file:
+            pickle.dump(topomaps, file)
+        self.save_node_images(name)
+        self.visualize()
+        shutil.copyfile(TOPOMAP_FIGURE, os.path.join(TOPOMAP_IMAGES_DIR, f"{name}.png"))
 
     def add_node(self, node_for_adding, **attr):
         count = 1
@@ -91,12 +123,11 @@ class Topomap(nx.DiGraph):
 
     def loopback(self,node:int,newpose:Pose):
         pose = self.nodes[node]['pose']
-        offset = offset_calculate(pose1=pose,pose2=newpose)
+        angle_diff, translation = get_transform(pose,newpose)
         for node in [n for n in self.nodes() if  n <= self.last_node_ID]:
-            self.nodes[node]['pose'].position.x += offset['dx']
-            self.nodes[node]['pose'].position.y += offset['dy']
+            self.nodes[node]['pose'].position.x, self.nodes[node]['pose'].position.y = transform(self.nodes[node]['pose'],angle_diff,translation)
             yaw = quaternion_to_euler(self.nodes[node]['pose'].orientation)[2]
-            yaw += offset['dyaw']
+            yaw += angle_diff
             yaw = (yaw + np.pi) % (2 * np.pi) - np.pi 
             quaternion = euler_to_quaternion([0, 0, yaw])
             self.nodes[node]['pose'].orientation.x = quaternion[0]
@@ -106,23 +137,13 @@ class Topomap(nx.DiGraph):
         self.loop_back = True
     
     def merge(self,node_reserved,node_replaced):
-        # 转移所有指向B的边到A
         for u, v, data in list(self.in_edges(node_replaced, data=True)):
-            if u != node_reserved:  # 避免自环
+            if u != node_reserved:
                 self.add_edge(u, node_reserved, weight=data['weight'])
-        # 转移所有从B出发的边到A
         for u, v, data in list(self.out_edges(node_replaced, data=True)):
-            if v != node_reserved:  # 避免自环
+            if v != node_reserved:
                 self.add_edge(node_reserved, v, weight=data['weight'])
-        # 删除节点B
         self.remove_node(node_replaced)
-
-
-    def pruning(self,node,node_list,distance_list,close_threshold):
-        for i in range(len(node_list)):
-            if distance_list[i] < close_threshold and node_list[i] != node:
-                self.merge(node,node_list[i])
-                print(f"replace node {node_list[i]} with node {node}")
 
     def shortest_path(self,node1,node2):
         try:
@@ -186,12 +207,12 @@ def main(args: argparse.Namespace):
     with open(TOPOMAPS, 'rb') as file:
         topomap = pickle.load(file)[args.name]
     # print(topomap.get_adjacency_matrix())
-    # print(topomap.path)
+    print(topomap.path)
     # print(topomap.nodes()[0]['image'])
-    print(topomap.shortest_path(3,12))
+    # print(topomap.shortest_path(3,12))
     # print(topomap.shortest_path(8,2))
     # print(topomap.shortest_path(30,1))
-    topomap.visualize()
+    topomap.visualize(show_distance=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")
