@@ -8,9 +8,9 @@ pass_word="classlab"
 
 # Split the window into four panes
 tmux selectp -t 0    # select the first (0) pane
-tmux splitw -h -p 50 # split it into two halves
-tmux selectp -t 0    # select the first (0) pane
 tmux splitw -v -p 50 # split it into two halves
+tmux selectp -t 1    # select the first (0) pane
+tmux splitw -h -p 50 # split it into two halves
 tmux selectp -t 0    # go back to the first pane
 
 # Run the ros launch command in the first pane

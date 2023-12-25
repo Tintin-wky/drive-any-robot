@@ -242,6 +242,7 @@ def main(args: argparse.Namespace):
                     if topomap.loop_back:
                         topomap.save(args.name)
                     else:
+                        rospy.loginfo("Not loopback!")
                         old_nodes = [n for n in topomap.nodes() if n <= topomap.last_node_ID]
                         for n in old_nodes:
                             topomap.remove_node(n)
@@ -258,6 +259,7 @@ def main(args: argparse.Namespace):
                     if topomap.loop_back:
                         topomap.save(args.name)
                     else:
+                        rospy.loginfo("Not loopback!")
                         old_nodes = [n for n in topomap.nodes() if n <= topomap.last_node_ID]
                         for n in old_nodes:
                             topomap.remove_node(n)

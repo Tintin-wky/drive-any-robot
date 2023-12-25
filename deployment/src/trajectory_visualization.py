@@ -6,7 +6,7 @@ import pickle
 
 TOPOMAPS="../topomaps/topomaps.pkl"
 ODOM_TOPIC = "/odom_chassis"
-NAME='outdoor'
+NAME='topomap'
 BAG_PATH_LIST = ["../bags/explore/outdoor1_1703408954_2023-12-24-17-09-15.bag"]
 
 def main():

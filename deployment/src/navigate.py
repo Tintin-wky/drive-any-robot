@@ -67,7 +67,7 @@ def callback_odom(msg: Odometry):
     global pose
     pose=msg.pose.pose
 
-def closest_node(model,topomap,image_queue):
+def get_closest_node(model,topomap,image_queue):
     transf_image = transform_images(image_queue, model_params["image_size"])
     check_distances = []
     check_nodes = [] 
@@ -132,37 +132,44 @@ def main(args: argparse.Namespace):
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
             if not path:
-                start_node, _ = closest_node(model, topomap, context_queue)
+                start_node, _ = get_closest_node(model, topomap, context_queue)
                 goal_queue = []
                 while len(goal_queue) < model_params["context"] + 1:
                     goal_queue.append(goal_img)
-                goal_node, _ = closest_node(model, topomap, goal_queue)
+                goal_node, _ = get_closest_node(model, topomap, goal_queue)
                 path = topomap.shortest_path(start_node, goal_node)
                 rospy.loginfo(f"path: {path}")
                 rospy.loginfo(f"start at node {path[0]}")
 
+            transf_obs_img = transform_images(context_queue, model_params["image_size"])
             if complete_path:
-                transf_obs_img = transform_images(context_queue, model_params["image_size"])
                 transf_sg_img = transform_images(goal_img, model_params["image_size"])
-                dist, waypoints = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
+                dist, waypoint = model(transf_obs_img.to(device), transf_sg_img.to(device)) 
                 distance=to_numpy(dist[0])
-                waypoint=to_numpy(waypoints[0][args.waypoint])
+                waypoint=to_numpy(waypoint[0][args.waypoint])
                 rospy.loginfo(f"Target: goal Estimate distance:{distance.item():.2f}")
             else:
                 check_distances = []
                 check_nodes = [] 
-                for node in topomap.neighbors(path[i],args.area):
+                waypoints = []
+                start = i
+                end = min(i + args.radius, len(path)-1)
+                for node in path[start:end+1]:
                     check_img= topomap.nodes[node]['image']
                     transf_check_img = transform_images(check_img, model_params["image_size"])
-                    dist, _ = model(transf_obs_img.to(device), transf_check_img.to(device)) 
+                    dist, waypoint = model(transf_obs_img.to(device), transf_check_img.to(device)) 
                     check_distances.append(to_numpy(dist[0]))
+                    waypoints.append(to_numpy(waypoint[0]))
                     check_nodes.append(node)
-                closest_node = check_nodes[np.argmin(check_distances)]
-                closest_distance = check_distances[np.argmin(check_distances)]
                 rospy.loginfo(f"Target node: {path[i]} nearby_nodes:{check_nodes}")
+                closest_index = np.argmin(check_distances)
+                closest_node = check_nodes[closest_index]
+                closest_distance = check_distances[closest_index]
+                chosen_waypoint = waypoints[closest_index][args.waypoint]
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
+                i += closest_index
 
-            if distance < args.close_threshold:
+            if closest_distance < args.close_threshold:
                 if complete_path:
                     reached_goal = True
                     rospy.loginfo(f"reach goal!")
@@ -179,8 +186,8 @@ def main(args: argparse.Namespace):
 
             waypoint_msg = Float32MultiArray()
             if model_params["normalize"]:
-                waypoint[:2] *= (MAX_V / RATE)
-            waypoint_msg.data = waypoint
+                chosen_waypoint[:2] *= (MAX_V / RATE)
+            waypoint_msg.data = chosen_waypoint
             waypoint_pub.publish(waypoint_msg)
 
             rate.sleep()
@@ -217,6 +224,14 @@ if __name__ == "__main__":
         type=int,
         help="""temporal distance within the next node in the topomap before 
         localizing to it (default: 3)""",
+    )
+    parser.add_argument(
+        "--radius",
+        "-r",
+        default=2,
+        type=int,
+        help="""temporal number of locobal nodes to look at in the topopmap for
+        localization (default: 2)""",
     )
     parser.add_argument(
         "--waypoint",
