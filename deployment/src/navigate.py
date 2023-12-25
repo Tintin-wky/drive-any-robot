@@ -165,9 +165,12 @@ def main(args: argparse.Namespace):
                 closest_index = np.argmin(check_distances)
                 closest_node = check_nodes[closest_index]
                 closest_distance = check_distances[closest_index]
-                chosen_waypoint = waypoints[closest_index][args.waypoint]
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
-                i += closest_index
+                if closest_distance < args.far_threshold:
+                    chosen_waypoint = waypoints[closest_index][args.waypoint]
+                    i += closest_index
+                else:
+                    chosen_waypoint = waypoints[0][args.waypoint]
 
             if closest_distance < args.close_threshold:
                 if complete_path:
@@ -224,6 +227,13 @@ if __name__ == "__main__":
         type=int,
         help="""temporal distance within the next node in the topomap before 
         localizing to it (default: 3)""",
+    )
+    parser.add_argument(
+        "--far_threshold",
+        default=15.,
+        type=int,
+        help="""temporal distance far away from the nodes in the topomap before 
+        localizing to it (default: 18)""",
     )
     parser.add_argument(
         "--radius",
