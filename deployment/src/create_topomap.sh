@@ -3,7 +3,6 @@
 # Create a new tmux session
 session_name="gnm_classbot_$(date +%s)"
 tmux new-session -d -s $session_name
-log="gnm_classbot_$(date +%s)"
 
 # Split the window into four panes
 tmux selectp -t 0    # select the first (0) pane
@@ -17,7 +16,7 @@ tmux send-keys "python create_topomap.py -s $@" Enter
 # Change the directory to ../navigate/bags and run the rosbag record command in the second pane
 tmux select-pane -t 1
 tmux send-keys "cd ../bags/explore" Enter
-tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis -o $log" Enter # change topic if necessary
+tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis -o gnm_classbot" Enter # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name

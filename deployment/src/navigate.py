@@ -186,7 +186,7 @@ def main(args: argparse.Namespace):
                         reached_goal = True
                         rospy.loginfo(f"reach goal!")
                 else:
-                    rospy.loginfo(f"arrive at node {path[i]} ({i}/{len(path)})")
+                    rospy.loginfo(f"arrive at node {path[i]} ({i}/{len(path)-1})")
                     i = i + 1
             goal_pub.publish(reached_goal)
             if reached_goal:
@@ -228,15 +228,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--close_threshold",
         "-t",
-        default=3,
-        type=int,
+        default=3.,
+        type=float,
         help="""temporal distance within the next node in the topomap before 
         localizing to it (default: 3)""",
     )
     parser.add_argument(
         "--far_threshold",
-        default=15.,
-        type=int,
+        default=10.,
+        type=float,
         help="""temporal distance far away from the nodes in the topomap before 
         localizing to it (default: 18)""",
     )

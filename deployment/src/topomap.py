@@ -201,20 +201,20 @@ class Topomap(nx.DiGraph):
         margin=1
         plt.xlim(xmin-margin,xmax+margin)
         plt.ylim(ymin-margin,ymax+margin)
-        plt.axis('off')
+        plt.axis('on')
         plt.savefig(TOPOMAP_FIGURE)
         plt.show()
 
 def main(args: argparse.Namespace):
     with open(TOPOMAPS, 'rb') as file:
-        topomap = pickle.load(file)[args.name]
+        topomaps = pickle.load(file)
+        topomap = topomaps[args.name]
     # print(topomap.get_adjacency_matrix())
+    # print(topomaps)
     print(topomap.path)
     # print(topomap.nodes()[0]['image'])
     # print(topomap.shortest_path(3,12))
-    # print(topomap.shortest_path(8,2))
-    # print(topomap.shortest_path(30,1))
-    topomap.visualize(show_distance=False)
+    # topomap.visualize(show_distance=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")
