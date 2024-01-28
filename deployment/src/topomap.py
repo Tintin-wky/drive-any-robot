@@ -13,7 +13,6 @@ from geometry_msgs.msg import Quaternion,Pose
 from models import gnm
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAPS="../topomaps/topomaps.pkl"
 TOPOMAP_FIGURE="../topomaps/topomap.png"
 
 def remove_files_in_dir(dir_path: str):
@@ -101,11 +100,9 @@ class Topomap(nx.DiGraph):
 
     def save(self,name):
         self.last_node_ID = list(self.nodes())[-1]
-        with open(TOPOMAPS, 'rb') as file:
-            topomaps = pickle.load(file)
-        topomaps[name] = self
-        with open(TOPOMAPS, 'wb') as file:
-            pickle.dump(topomaps, file)
+        topomap_path = f"../topomaps/{args.name}.pkl"
+        with open(topomap_path, 'wb') as file:
+            pickle.dump(self, file)
         self.save_node_images(name)
         self.visualize()
         shutil.copyfile(TOPOMAP_FIGURE, os.path.join(TOPOMAP_IMAGES_DIR, f"{name}.png"))
@@ -206,12 +203,12 @@ class Topomap(nx.DiGraph):
         plt.show()
 
 def main(args: argparse.Namespace):
-    with open(TOPOMAPS, 'rb') as file:
-        topomaps = pickle.load(file)
-        topomap = topomaps[args.name]
-    # print(topomap.get_adjacency_matrix())
-    # print(topomaps)
-    print(topomap.path)
+    topomap_path = f"../topomaps/{args.name}.pkl"
+    with open(topomap_path, 'rb') as file:
+        topomap = pickle.load(file)
+    # # print(topomap.get_adjacency_matrix())
+    print(topomap)
+    # print(topomap.path)
     # print(topomap.nodes()[0]['image'])
     # print(topomap.shortest_path(3,12))
     # topomap.visualize(show_distance=False)

@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import pickle
 
-TOPOMAPS="../topomaps/topomaps.pkl"
 ODOM_TOPIC = "/odom_chassis"
 NAME='topomap'
 BAG_PATH_LIST = ["../bags/explore/outdoor1_1703408954_2023-12-24-17-09-15.bag"]
@@ -24,8 +23,9 @@ def main():
         plt.plot(x, y, label='Trajectory ' + str(i))
         i += 1
     
-    with open(TOPOMAPS, 'rb') as file:
-        topomap = pickle.load(file)[NAME]
+    topomap_path = f"../topomaps/{NAME}.pkl"
+    with open(topomap_path, 'rb') as file:
+        topomap = pickle.load(file)
     x_nodes=[]
     y_nodes=[]
     for i in topomap.nodes():

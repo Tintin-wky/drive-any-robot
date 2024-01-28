@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 
 ODOM_DISTANCE_TOPIC = "/odom_distance"
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAPS="../topomaps/topomaps.pkl"
 
 def main(args:argparse.Namespace):
     rospy.init_node("distance_visualization", anonymous=False)
 
-    with open(TOPOMAPS, 'rb') as file:
-        topomap = pickle.load(file)[args.name]
+    topomap_path = f"../topomaps/{args.name}.pkl"
+    with open(topomap_path, 'rb') as file:
+        topomap = pickle.load(file)
     path=topomap.path[0]
     x=[]
     y=[]

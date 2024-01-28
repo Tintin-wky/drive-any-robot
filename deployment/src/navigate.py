@@ -29,7 +29,6 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-TOPOMAPS="../topomaps/topomaps.pkl"
 DESTINATION_DIR="../destination"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
@@ -109,8 +108,9 @@ def main(args: argparse.Namespace):
     model.eval()
 
     # load topomaps
-    with open(TOPOMAPS, 'rb') as file:
-        topomap = pickle.load(file)[args.name]
+    topomap_path = f"../topomaps/{args.name}.pkl"
+    with open(topomap_path, 'rb') as file:
+        topomap = pickle.load(file)
         topomap.reset()
 
     # load destination

@@ -33,7 +33,6 @@ MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 ODOM_TOPIC = "/odom_chassis"
-TOPOMAPS="../topomaps/topomaps.pkl"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -103,8 +102,9 @@ def main(args: argparse.Namespace):
     if args.restart:
         topomap=Topomap()
     else:
-        with open(TOPOMAPS, 'rb') as file:
-            topomap = pickle.load(file)[args.name]
+        topomap_path = f"../topomaps/{args.name}.pkl"
+        with open(topomap_path, 'rb') as file:
+            topomap = pickle.load(file)
         topomap.reset()
 
     # ROS
