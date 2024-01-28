@@ -128,6 +128,8 @@ def main(args: argparse.Namespace):
     path = []
     complete_path = False
     reached_goal = False
+    forward_point = None
+    forward_point_count = 0
     # navigation loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
@@ -169,6 +171,16 @@ def main(args: argparse.Namespace):
                 closest_distance = check_distances[closest_index]
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
                 if closest_distance < args.far_threshold:
+                    if forward_point is None:
+                        forward_point = waypoints[closest_index][args.waypoint]
+                    elif forward_point == waypoints[closest_index][args.waypoint]:
+                        forward_point_count += 1
+                    else:
+                        forward_point = waypoints[closest_index][args.waypoint]
+                        forward_point_count = 0
+                if forward_point_count >= 3:
+                    forward_point_count = 0
+                    forward_point = None
                     chosen_waypoint = waypoints[closest_index][args.waypoint]
                     i += closest_index
                 else:
