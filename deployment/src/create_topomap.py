@@ -3,6 +3,7 @@ import rospy
 from sensor_msgs.msg import Image,CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
 from nav_msgs.msg import Odometry
+from gps_common.msg import GPSFix
 from geometry_msgs.msg import Pose
 
 import torch
@@ -33,6 +34,7 @@ MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
 ODOM_TOPIC = "/odom_chassis"
+GPS_TOPIC = "/gps/gps"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
 model_params = {
@@ -55,6 +57,7 @@ print("Using device:", device)
 context_queue = []
 obs_img = PILImage.Image()
 pose = Pose()
+gps = GPSFix()
 
 def callback_obs(msg):
     global last_message_time
@@ -70,6 +73,10 @@ def callback_obs(msg):
 def callback_odom(msg: Odometry):
     global pose
     pose=msg.pose.pose
+
+def callback_gps(msg: GPSFix):
+    global gps
+    gps=msg
 
 def main(args: argparse.Namespace):
     # load model parameters
@@ -112,6 +119,7 @@ def main(args: argparse.Namespace):
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
     odom_msg = rospy.Subscriber(ODOM_TOPIC, Odometry, callback_odom, queue_size=1)
+    gps_msg = rospy.Subscriber(GPS_TOPIC, GPSFix, callback_gps)
     closest_node_pub = rospy.Publisher("/topoplan/closest_node", Image, queue_size=1)
     last_node_pub = rospy.Publisher("/topoplan/last_node", Image, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
@@ -127,7 +135,7 @@ def main(args: argparse.Namespace):
             if ID == 0:
                 closest_node = ID
                 path.append(closest_node)
-                topomap.add_node(closest_node, image=obs_img, pose=pose)
+                topomap.add_node(closest_node, image=obs_img, pose=pose, gps=gps)
                 rospy.loginfo("start create a new topomap")
                 last_node = ID
                 ID += 1
@@ -154,7 +162,7 @@ def main(args: argparse.Namespace):
                     else:
                         closest_node = ID
                         path.append(closest_node)
-                        topomap.add_node(closest_node, image=obs_img, pose=pose)
+                        topomap.add_node(closest_node, image=obs_img, pose=pose, gps=gps)
                         rospy.loginfo(f"start create a new topomap at node {ID}")
                         last_node = closest_node
                         ID += 1
@@ -211,7 +219,7 @@ def main(args: argparse.Namespace):
                 elif closest_distance > args.far_threshold:
                     closest_node = ID
                     path.append(closest_node)
-                    topomap.add_node(closest_node, image=obs_img, pose=pose)
+                    topomap.add_node(closest_node, image=obs_img, pose=pose, gps=gps)
                     topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = ID
@@ -220,7 +228,7 @@ def main(args: argparse.Namespace):
                 elif temporal_count >= (args.dt*RATE): 
                     closest_node = ID
                     path.append(closest_node)
-                    topomap.add_node(closest_node, image=obs_img, pose=pose)
+                    topomap.add_node(closest_node, image=obs_img, pose=pose, gps=gps)
                     topomap.add_edge(last_node,closest_node,weight=temporal_count / RATE)
                     rospy.loginfo(f"from {last_node}[{topomap.nodes[last_node]['count']}] reach {closest_node}[{topomap.nodes[closest_node]['count']}]")
                     last_node = ID

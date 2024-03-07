@@ -1,12 +1,13 @@
 # ROS
 import rospy
-from sensor_msgs.msg import CompressedImage,Image
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Bool, Float32MultiArray
 from nav_msgs.msg import Odometry
+from gps_common.msg import GPSFix
 from geometry_msgs.msg import Pose
 
 import torch
-from PIL import Image as PILImage
+from PIL import Image
 import numpy as np
 import os
 import pickle
@@ -16,6 +17,7 @@ import io
 
 # UTILS
 from utils import to_numpy, transform_images, load_model
+from gps import get_gps
 
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
@@ -29,6 +31,7 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
+GPS_TOPIC = "/gps/gps"
 DESTINATION_DIR="../destination"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
@@ -49,33 +52,39 @@ model_params = {
 # GLOBALS
 context_queue = []
 odom = Pose()
+latlon = None
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
 def callback_obs(msg):
-    obs_img = PILImage.open(io.BytesIO(msg.data))
+    obs_img = Image.open(io.BytesIO(msg.data))
     global context_queue
     if len(context_queue) < model_params["context"] + 1:
         context_queue.append(obs_img)
     else:
         context_queue.pop(0)
         context_queue.append(obs_img)
-    
-def callback_odom(msg: Odometry):
-    global pose
-    pose=msg.pose.pose
 
-def get_closest_node(model,topomap,image_queue):
+def callback_gps(msg: GPSFix):
+    global latlon
+    latlon={'latitude':msg.latitude,'longitude':msg.longitude}
+
+def get_closest_node(model,topomap,image_queue,latlon=None):
     transf_image = transform_images(image_queue, model_params["image_size"])
     check_distances = []
     check_nodes = [] 
     for node in topomap.nodes():
+        if latlon is not None:
+            if topomap.nodes[node].get('gps') is not None:
+                if abs(latlon['latitude']-topomap.nodes()[node]['gps'].latitude) > 0.0001 or abs(latlon['longitude']-topomap.nodes()[node]['gps'].longitude) > 0.0001:
+                    continue
         check_img= topomap.nodes[node]['image']
         transf_check_img = transform_images(check_img, model_params["image_size"])
         dist, _ = model(transf_image.to(device), transf_check_img.to(device)) 
         check_distances.append(to_numpy(dist[0]))
         check_nodes.append(node)
+    rospy.loginfo(f"check nodes:{check_nodes}")
     closest_node = check_nodes[np.argmin(check_distances)]
     closest_distance = check_distances[np.argmin(check_distances)]
     return closest_node, closest_distance
@@ -114,12 +123,15 @@ def main(args: argparse.Namespace):
         topomap.reset()
 
     # load destination
-    goal_img=PILImage.open(os.path.join(DESTINATION_DIR, f"{args.destination}.png"))
+    goal_img=Image.open(os.path.join(DESTINATION_DIR, f"{args.destination}.jpg"))
+    goal_latlon = get_gps(goal_img)
+    # goal_latlon={'latitude':22.5883,'longitude':113.9670}
 
     # ROS
     rospy.init_node("TOPOPLAN", anonymous=False)
     rate = rospy.Rate(RATE)
     image_curr_msg = rospy.Subscriber(IMAGE_TOPIC, CompressedImage, callback_obs, queue_size=1)
+    gps_curr_msg = rospy.Subscriber(GPS_TOPIC, GPSFix, callback_gps, queue_size=1)
     waypoint_pub = rospy.Publisher("/waypoint", Float32MultiArray, queue_size=1)
     goal_pub = rospy.Publisher("/topoplan/reached_goal", Bool, queue_size=1)
     rospy.loginfo("Registered with master node. Waiting for image observations...")
@@ -128,17 +140,18 @@ def main(args: argparse.Namespace):
     path = []
     complete_path = False
     reached_goal = False
-    forward_point = None
+    forward_node = None
     forward_point_count = 0
     # navigation loop
     while not rospy.is_shutdown():
         if len(context_queue) > model_params["context"]:
             if not path:
-                start_node, distance_start = get_closest_node(model, topomap, context_queue)
+                global latlon
+                start_node, distance_start = get_closest_node(model, topomap, context_queue, latlon)
                 goal_queue = []
                 while len(goal_queue) < model_params["context"] + 1:
                     goal_queue.append(goal_img)
-                goal_node, distance_end = get_closest_node(model, topomap, goal_queue)
+                goal_node, distance_end = get_closest_node(model, topomap, goal_queue, goal_latlon)
                 path = topomap.shortest_path(start_node, goal_node)
                 rospy.loginfo(f"path: {path}")
                 rospy.loginfo(f"start at node {path[0]} distance:{distance_start}")
@@ -171,16 +184,17 @@ def main(args: argparse.Namespace):
                 closest_distance = check_distances[closest_index]
                 rospy.loginfo(f"closest node: {closest_node} distance: {closest_distance.item():.2f}")
                 if closest_distance < args.far_threshold:
-                    if forward_point is None:
-                        forward_point = waypoints[closest_index][args.waypoint]
-                    elif forward_point == waypoints[closest_index][args.waypoint]:
+                    if forward_node is None:
+                        forward_node = closest_node
+                    elif forward_node == closest_node and forward_node != path[i]:
                         forward_point_count += 1
+                        rospy.loginfo(f"forward node: {forward_node} count:{forward_point_count}")
                     else:
-                        forward_point = waypoints[closest_index][args.waypoint]
+                        forward_node = closest_node
                         forward_point_count = 0
                 if forward_point_count >= 3:
                     forward_point_count = 0
-                    forward_point = None
+                    forward_node = None
                     chosen_waypoint = waypoints[closest_index][args.waypoint]
                     i += closest_index
                 else:

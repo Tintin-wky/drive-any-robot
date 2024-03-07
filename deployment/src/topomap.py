@@ -11,9 +11,10 @@ from tqdm import tqdm
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Quaternion,Pose
 from models import gnm
+import piexif
+from fractions import Fraction
 
 TOPOMAP_IMAGES_DIR = "../topomaps/images"
-TOPOMAP_FIGURE="../topomaps/topomap.png"
 
 def remove_files_in_dir(dir_path: str):
     for f in os.listdir(dir_path):
@@ -68,6 +69,7 @@ class Topomap(nx.DiGraph):
         self.path = []
         self.last_node_ID = -1
         self.loop_back = True
+        self.name = None
 
     def get_adjacency_matrix(self):
         last_node = list(self.nodes())[-1] + 1
@@ -87,8 +89,16 @@ class Topomap(nx.DiGraph):
             self.nodes[i]['count'] = 0
         self.loop_back = False
 
-    def save_node_images(self,name):
-        topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, name)
+    
+    def save_node_images(self):
+        def to_dms(value):
+            degree = int(value)
+            temp_minute = (value - degree) * 60
+            minute = int(temp_minute)
+            second = (temp_minute - minute) * 60
+            return (Fraction(degree, 1), Fraction(minute, 1), Fraction(int(second * 10000), 10000))
+
+        topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, self.name)
         if not os.path.isdir(topomap_name_dir):
             os.makedirs(topomap_name_dir)
         else:
@@ -96,16 +106,32 @@ class Topomap(nx.DiGraph):
             remove_files_in_dir(topomap_name_dir)
         for node in tqdm(self.nodes(),total=self.number_of_nodes(), desc="Saving"):
             image = self.nodes[node]['image']
-            image.save(os.path.join(topomap_name_dir, f"{node}.png"))
+            if self.nodes[node].get('gps') is not None:
+                gps_latitude = to_dms(self.nodes[node]['gps'].latitude)
+                gps_longitude = to_dms(self.nodes[node]['gps'].longitude)
+
+                # 创建EXIF数据，包含GPS信息
+                exif_dict = {
+                    "GPS": {
+                        piexif.GPSIFD.GPSLatitudeRef: 'N' if self.nodes[node]['gps'].latitude >= 0 else 'S',
+                        piexif.GPSIFD.GPSLatitude: tuple(map(lambda x: (x.numerator, x.denominator), gps_latitude)),
+                        piexif.GPSIFD.GPSLongitudeRef: 'E' if self.nodes[node]['gps'].longitude >= 0 else 'W',
+                        piexif.GPSIFD.GPSLongitude: tuple(map(lambda x: (x.numerator, x.denominator), gps_longitude)),
+                    }
+                }
+                exif_bytes = piexif.dump(exif_dict)
+                image.save(os.path.join(topomap_name_dir, f"{node}.jpg"), "JPEG", exif=exif_bytes)
+            else:
+                image.save(os.path.join(topomap_name_dir, f"{node}.jpg"))
 
     def save(self,name):
+        self.name = name
         self.last_node_ID = list(self.nodes())[-1]
-        topomap_path = f"../topomaps/{args.name}.pkl"
+        topomap_path = f"../topomaps/{self.name}.pkl"
         with open(topomap_path, 'wb') as file:
             pickle.dump(self, file)
-        self.save_node_images(name)
+        self.save_node_images()
         self.visualize()
-        shutil.copyfile(TOPOMAP_FIGURE, os.path.join(TOPOMAP_IMAGES_DIR, f"{name}.png"))
 
     def add_node(self, node_for_adding, **attr):
         count = 1
@@ -164,29 +190,51 @@ class Topomap(nx.DiGraph):
             distance = np.linalg.norm(np.array([x0,y0]) - np.array([x,y]))
             if distance < area:
                 neighbors.add(node)
+            if self.nodes[n]['gps'] is not None and self.nodes[node]['gps'] is not None:
+                if abs(self.nodes[n]['gps']['latitude']-self.nodes()[node]['gps'].latitude) < 0.0001 and abs(self.nodes[n]['gps']['longitude']-self.nodes()[node]['gps'].longitude) < 0.0001:
+                    neighbors.add(node)
         return neighbors
     
-    def visualize(self,show_image=True,show_distance=True):
+    def visualize(self,show_image=True,show_distance=True, use_gps=True):
         fig, ax = plt.subplots()
         
         nodes=list(self.nodes())
-        x0=self.nodes[nodes[0]]['pose'].position.x
-        y0=self.nodes[nodes[0]]['pose'].position.y
-        xmin,xmax,ymin,ymax=0,0,0,0
-        pos = {}
-        for node,data in self.nodes(data=True):
-            x=data['pose'].position.x - x0
-            y=data['pose'].position.y - y0
-            pos.update({node:np.array([x,y])})
-            xmin=x if x<xmin else xmin
-            xmax=x if x>xmax else xmax
-            ymin=y if y<ymin else ymin
-            ymax=y if y>ymax else ymax
+
+        if(use_gps):
+            latitude_scale = 102662
+            longitude_scale = 111195
+            x0=self.nodes[nodes[0]]['gps'].longitude*longitude_scale
+            y0=self.nodes[nodes[0]]['gps'].latitude*latitude_scale
+            xmin,xmax,ymin,ymax=0,0,0,0
+            pos = {}
+            x = x0
+            y = y0
+            for node,data in self.nodes(data=True):
+                x=data['gps'].longitude*longitude_scale - x0 if data['gps'].longitude >= 1e-3 else x
+                y=data['gps'].latitude*latitude_scale - y0 if data['gps'].latitude >= 1e-3 else y
+                pos.update({node:np.array([x,y])}) 
+                xmin=x if x<xmin else xmin
+                xmax=x if x>xmax else xmax
+                ymin=y if y<ymin else ymin
+                ymax=y if y>ymax else ymax
+        else:
+            x0=self.nodes[nodes[0]]['pose'].position.x
+            y0=self.nodes[nodes[0]]['pose'].position.y
+            xmin,xmax,ymin,ymax=0,0,0,0
+            pos = {}
+            for node,data in self.nodes(data=True):
+                x=data['pose'].position.x - x0
+                y=data['pose'].position.y - y0
+                pos.update({node:np.array([x,y])})
+                xmin=x if x<xmin else xmin
+                xmax=x if x>xmax else xmax
+                ymin=y if y<ymin else ymin
+                ymax=y if y>ymax else ymax
 
         for node, (x, y) in pos.items():
             if(show_image):
                 image = self.nodes[node]['image']
-                ax.imshow(image, extent=[x-0.8, x+0.8, y-0.6, y+0.6], aspect='auto')
+                ax.imshow(image, extent=[x-2, x+2, y-2, y+2], aspect='auto')
             ax.annotate(node, (x, y-1), fontsize=12, ha="center", va="center",color="r")
         nx.draw_networkx_edges(self, pos,node_size=2000)
 
@@ -195,11 +243,14 @@ class Topomap(nx.DiGraph):
             edge_labels = {(k[0], k[1]): f"{v:.2f}" for k, v in edge_labels.items()}
             nx.draw_networkx_edge_labels(self, pos, edge_labels=edge_labels, font_size=10)
 
-        margin=1
-        plt.xlim(xmin-margin,xmax+margin)
-        plt.ylim(ymin-margin,ymax+margin)
+        margin=2
+        egde = max(xmax-xmin,ymax-ymin)/2
+        xmid = (xmin+xmax)/2
+        ymid = (ymin+ymax)/2
+        plt.xlim(xmid-egde-margin,xmid+egde+margin)
+        plt.ylim(ymid-egde-margin,ymid+egde+margin)
         plt.axis('on')
-        plt.savefig(TOPOMAP_FIGURE)
+        plt.savefig(os.path.join(TOPOMAP_IMAGES_DIR,f"/{self.name}.jpg"))
         plt.show()
 
 def main(args: argparse.Namespace):
@@ -207,11 +258,13 @@ def main(args: argparse.Namespace):
     with open(topomap_path, 'rb') as file:
         topomap = pickle.load(file)
     # # print(topomap.get_adjacency_matrix())
-    print(topomap)
+    # print(topomap)
     # print(topomap.path)
-    # print(topomap.nodes()[0]['image'])
+    print(topomap.nodes()[0]['gps'].latitude)
+    print(topomap.nodes()[1]['gps'].latitude)
+    print(topomap.nodes()[2]['gps'].latitude)
     # print(topomap.shortest_path(3,12))
-    # topomap.visualize(show_distance=False)
+    # topomap.visualize(use_gps=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")

@@ -7,7 +7,7 @@ tmux new-session -d -s $session_name
 # Change the directory to ../topomaps/bags and run the rosbag record command
 tmux select-pane -t 0
 tmux send-keys "cd ../bags/raw" Enter
-tmux send-keys "rosbag record /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /odom_chassis -o $1" # change topic if necessary
+tmux send-keys "rosbag record /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /odom_chassis /gps/gps /gps/imu -o $1" # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name
