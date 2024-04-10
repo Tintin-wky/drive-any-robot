@@ -10,8 +10,19 @@
   </include>
 
   <!-- ByNav GNSS/INS -->
-  <!-- <include file="$(find bynav_ros_driver)/launch/connect_net.launch">
-  </include> -->
+  <include file="$(find bynav_ros_driver)/launch/connect_net.launch">
+  </include>
+
+  <!-- imu ekf pose -->
+  <include file="$(find imu_ekf_ros)/launch/cpp_ekf.launch">
+  </include>
+
+  <node pkg="tf2_ros" type="static_transform_publisher" name="world_broadcaster" args="1 0 0 0 0 0 1 base_footprint imu_link" >
+  </node>
+
+  <include file="$(find robot_pose_ekf)/robot_pose_ekf.launch">
+  </include>
+
 
   <!-- BEV Map -->
   <!-- <include file="$(find trajectory_tracking)/launch/map_visualize.launch">
