@@ -14,7 +14,7 @@ from models import gnm
 import piexif
 from fractions import Fraction
 
-TOPOMAP_IMAGES_DIR = "../topomaps/images"
+TOPOMAP_IMAGES_DIR = "../topomaps"
 
 def remove_files_in_dir(dir_path: str):
     for f in os.listdir(dir_path):
@@ -98,7 +98,7 @@ class Topomap(nx.DiGraph):
             second = (temp_minute - minute) * 60
             return (Fraction(degree, 1), Fraction(minute, 1), Fraction(int(second * 10000), 10000))
 
-        topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, self.name)
+        topomap_name_dir = os.path.join(TOPOMAP_IMAGES_DIR, 'images', self.name)
         if not os.path.isdir(topomap_name_dir):
             os.makedirs(topomap_name_dir)
         else:
@@ -191,11 +191,11 @@ class Topomap(nx.DiGraph):
             if distance < area:
                 neighbors.add(node)
             if self.nodes[n]['gps'] is not None and self.nodes[node]['gps'] is not None:
-                if abs(self.nodes[n]['gps']['latitude']-self.nodes()[node]['gps'].latitude) < 0.0001 and abs(self.nodes[n]['gps']['longitude']-self.nodes()[node]['gps'].longitude) < 0.0001:
+                if abs(self.nodes[n]['gps'].latitude-self.nodes()[node]['gps'].latitude) < 0.0001 and abs(self.nodes[n]['gps'].longitude-self.nodes()[node]['gps'].longitude) < 0.0001:
                     neighbors.add(node)
         return neighbors
     
-    def visualize(self,show_image=True,show_distance=True, use_gps=True):
+    def visualize(self,show_image=True,show_distance=True, use_gps=False):
         fig, ax = plt.subplots()
         
         nodes=list(self.nodes())
@@ -250,7 +250,7 @@ class Topomap(nx.DiGraph):
         plt.xlim(xmid-egde-margin,xmid+egde+margin)
         plt.ylim(ymid-egde-margin,ymid+egde+margin)
         plt.axis('on')
-        plt.savefig(os.path.join(TOPOMAP_IMAGES_DIR,f"/{self.name}.jpg"))
+        plt.savefig(os.path.join(TOPOMAP_IMAGES_DIR,f"{self.name}.jpg"))
         plt.show()
 
 def main(args: argparse.Namespace):
@@ -260,11 +260,8 @@ def main(args: argparse.Namespace):
     # # print(topomap.get_adjacency_matrix())
     # print(topomap)
     # print(topomap.path)
-    print(topomap.nodes()[0]['gps'].latitude)
-    print(topomap.nodes()[1]['gps'].latitude)
-    print(topomap.nodes()[2]['gps'].latitude)
     # print(topomap.shortest_path(3,12))
-    # topomap.visualize(use_gps=False)
+    topomap.visualize(use_gps=True,show_distance=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=f"get info of your chosen topomap")

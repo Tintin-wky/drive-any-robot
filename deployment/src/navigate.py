@@ -84,6 +84,8 @@ def get_closest_node(model,topomap,image_queue,latlon=None):
         dist, _ = model(transf_image.to(device), transf_check_img.to(device)) 
         check_distances.append(to_numpy(dist[0]))
         check_nodes.append(node)
+    if latlon is not None:
+        rospy.loginfo(f"latitude:{latlon['latitude']} longitude:{latlon['longitude']}")
     rospy.loginfo(f"check nodes:{check_nodes}")
     closest_node = check_nodes[np.argmin(check_distances)]
     closest_distance = check_distances[np.argmin(check_distances)]
