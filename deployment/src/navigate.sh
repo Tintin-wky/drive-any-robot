@@ -16,7 +16,7 @@ tmux selectp -t 0    # go back to the first pane
 # Run the navigate.py script with command line args in the first pane
 tmux select-pane -t 0
 tmux send-keys "conda activate gnm_deployment" Enter
-tmux send-keys "python navigate.py $@" Enter
+tmux send-keys "python navigate.py -n $1 -d $2" Enter
 
 # Run the pd_controller.py script in the second pane
 tmux select-pane -t 1

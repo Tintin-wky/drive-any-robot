@@ -72,6 +72,8 @@ def callback_gps(msg: GPSFix):
 
 def get_closest_node(model,topomap,image_queue,latlon=None):
     transf_image = transform_images(image_queue, model_params["image_size"])
+    if latlon is not None:
+        rospy.loginfo(f"latitude:{latlon['latitude']} longitude:{latlon['longitude']}")
     check_distances = []
     check_nodes = [] 
     for node in topomap.nodes():
@@ -79,13 +81,12 @@ def get_closest_node(model,topomap,image_queue,latlon=None):
             if topomap.nodes[node].get('gps') is not None:
                 if abs(latlon['latitude']-topomap.nodes()[node]['gps'].latitude) > 0.0001 or abs(latlon['longitude']-topomap.nodes()[node]['gps'].longitude) > 0.0001:
                     continue
+        rospy.loginfo(f"latitude:{topomap.nodes()[node]['gps'].latitude} longitude:{topomap.nodes()[node]['gps'].longitude}")
         check_img= topomap.nodes[node]['image']
         transf_check_img = transform_images(check_img, model_params["image_size"])
         dist, _ = model(transf_image.to(device), transf_check_img.to(device)) 
         check_distances.append(to_numpy(dist[0]))
         check_nodes.append(node)
-    if latlon is not None:
-        rospy.loginfo(f"latitude:{latlon['latitude']} longitude:{latlon['longitude']}")
     rospy.loginfo(f"check nodes:{check_nodes}")
     closest_node = check_nodes[np.argmin(check_distances)]
     closest_distance = check_distances[np.argmin(check_distances)]

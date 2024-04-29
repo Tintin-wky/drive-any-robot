@@ -13,7 +13,7 @@
   <include file="$(find bynav_ros_driver)/launch/connect_net.launch">
   </include>
 
-  <!-- imu ekf pose -->
+  <!-- imu ekf pose
   <include file="$(find imu_ekf_ros)/launch/cpp_ekf.launch">
   </include>
 
@@ -21,7 +21,7 @@
   </node>
 
   <include file="$(find robot_pose_ekf)/robot_pose_ekf.launch">
-  </include>
+  </include> -->
 
 
   <!-- BEV Map -->

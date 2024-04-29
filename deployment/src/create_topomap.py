@@ -33,7 +33,8 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-ODOM_TOPIC = "/robot_pose_ekf/odom_combined"
+ODOM_TOPIC = "/odom_chassis"
+# ODOM_TOPIC = "/robot_pose_ekf/odom_combined"
 GPS_TOPIC = "/gps/gps"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
