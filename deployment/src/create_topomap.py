@@ -34,8 +34,8 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-# ODOM_TOPIC = "/robot_pose_ekf/odom_combined"
-ODOM_TOPIC = "/odom_chassis"
+ODOM_TOPIC = "/robot_pose_ekf/odom_combined"
+# ODOM_TOPIC = "/odom_chassis"
 GPS_TOPIC = "/gps/gps"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
@@ -58,6 +58,7 @@ print("Using device:", device)
 
 # GLOBALS
 context_queue = []
+latlon_queue = []
 obs_img = None
 pose = None
 gps = None
@@ -78,11 +79,21 @@ def callback_odom(msg: Odometry):
     pose=msg.pose.pose
 
 def callback_gps(msg: GPSFix):
-    global gps
+    latlon=None
     if(msg.latitude!=0 and msg.longitude!=0):
-        gps=LatLon(latitude=msg.latitude,longitude=msg.longitude)
+        latlon=LatLon(latitude=msg.latitude,longitude=msg.longitude)
+    global latlon_queue
+    if len(latlon_queue) < 100:
+        latlon_queue.append(latlon)
     else:
-        gps=None
+        latlon_queue.pop(0)
+        latlon_queue.append(latlon)
+    global gps
+    gps=None
+    for i in range(-1,-len(latlon_queue)-1,-1):
+        if latlon_queue[i] is not None:
+            gps=latlon_queue[i]
+            break
 
 def main(args: argparse.Namespace):
     # load model parameters
