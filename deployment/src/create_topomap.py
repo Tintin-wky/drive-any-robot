@@ -20,6 +20,7 @@ import pickle
 import shutil
 import io
 from topomap import Topomap
+from latlon import LatLon
 
 import sys
 sys.path.append('/home/classlab/drive-any-robot/train')
@@ -33,8 +34,8 @@ MAX_V = robot_config["max_v"]
 MAX_W = robot_config["max_w"]
 RATE = robot_config["frame_rate"] 
 IMAGE_TOPIC = "/camera/left/image_raw/compressed"
-ODOM_TOPIC = "/odom_chassis"
 # ODOM_TOPIC = "/robot_pose_ekf/odom_combined"
+ODOM_TOPIC = "/odom_chassis"
 GPS_TOPIC = "/gps/gps"
 
 # DEFAULT MODEL PARAMETERS (can be overwritten by model.yaml)
@@ -54,11 +55,12 @@ model_params = {
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
 
+
 # GLOBALS
 context_queue = []
-obs_img = PILImage.Image()
-pose = Pose()
-gps = GPSFix()
+obs_img = None
+pose = None
+gps = None
 
 def callback_obs(msg):
     global last_message_time
@@ -77,7 +79,10 @@ def callback_odom(msg: Odometry):
 
 def callback_gps(msg: GPSFix):
     global gps
-    gps=msg
+    if(msg.latitude!=0 and msg.longitude!=0):
+        gps=LatLon(latitude=msg.latitude,longitude=msg.longitude)
+    else:
+        gps=None
 
 def main(args: argparse.Namespace):
     # load model parameters

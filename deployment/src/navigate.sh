@@ -26,7 +26,7 @@ tmux send-keys "python pd_controller.py" Enter
 # Change the directory to ../navigate/bags and run the rosbag record command in the third pane
 tmux select-pane -t 2
 tmux send-keys "cd ../bags/navigate" Enter
-tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis /robot_pose_ekf/odom_combined /gps/gps /imu -o gnm_classbot_$1_$2" Enter # change topic if necessary
+tmux send-keys "rosbag record /rosout /camera/left/image_raw/compressed /camera/right/image_raw/compressed /scout_status /cmd_vel /odom_chassis /robot_pose_ekf/odom_combined /gps/gps /imu /imu/data_raw -o gnm_classbot_$1_$2" Enter # change topic if necessary
 
 # Attach to the tmux session
 tmux -2 attach-session -t $session_name
