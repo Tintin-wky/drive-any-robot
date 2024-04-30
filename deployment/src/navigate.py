@@ -71,6 +71,8 @@ def callback_gps(msg: GPSFix):
     latlon={'latitude':msg.latitude,'longitude':msg.longitude}
 
 def get_closest_node(model,topomap,image_queue,latlon=None):
+    if latlon is not None:
+        rospy.loginfo(f"latitude:{latlon['latitude']} longitude:{latlon['longitude']}")
     transf_image = transform_images(image_queue, model_params["image_size"])
     check_distances = []
     check_nodes = [] 
@@ -84,8 +86,6 @@ def get_closest_node(model,topomap,image_queue,latlon=None):
         dist, _ = model(transf_image.to(device), transf_check_img.to(device)) 
         check_distances.append(to_numpy(dist[0]))
         check_nodes.append(node)
-    if latlon is not None:
-        rospy.loginfo(f"latitude:{latlon['latitude']} longitude:{latlon['longitude']}")
     rospy.loginfo(f"check nodes:{check_nodes}")
     closest_node = check_nodes[np.argmin(check_distances)]
     closest_distance = check_distances[np.argmin(check_distances)]
@@ -150,14 +150,17 @@ def main(args: argparse.Namespace):
             if not path:
                 global latlon
                 start_node, distance_start = get_closest_node(model, topomap, context_queue, latlon)
+                rospy.loginfo(f"start at node {start_node} distance:{distance_start}")
                 goal_queue = []
                 while len(goal_queue) < model_params["context"] + 1:
                     goal_queue.append(goal_img)
                 goal_node, distance_end = get_closest_node(model, topomap, goal_queue, goal_latlon)
-                path = topomap.shortest_path(start_node, goal_node)
-                rospy.loginfo(f"path: {path}")
-                rospy.loginfo(f"start at node {path[0]} distance:{distance_start}")
-                rospy.loginfo(f"end at node {path[-1]} distance:{distance_end}")
+                rospy.loginfo(f"end at node {goal_node} distance:{distance_end}")
+                solved, path = topomap.shortest_path(start_node, goal_node)
+                if solved:
+                    rospy.loginfo(f"path: {path}")
+                else:
+                    rospy.loginfo(f"No path!")
 
             transf_obs_img = transform_images(context_queue, model_params["image_size"])
             if complete_path:

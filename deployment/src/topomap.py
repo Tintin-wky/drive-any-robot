@@ -170,11 +170,9 @@ class Topomap(nx.DiGraph):
 
     def shortest_path(self,node1,node2):
         try:
-            return nx.shortest_path(self, source=node1, target=node2, weight='weight')
+            return True, nx.shortest_path(self, source=node1, target=node2, weight='weight')
         except nx.NetworkXNoPath:
-            node_list = [node1]
-            node_list.extend(super().neighbors(node1))
-            return node_list
+            return False, [node1]
 
     def neighbors(self, n, area):
         neighbors=set()
